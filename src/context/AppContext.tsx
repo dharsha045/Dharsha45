@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode, useRef } from 'react';
 import {
   Donor,
   BloodRequest,
@@ -15,6 +15,7 @@ import {
   INITIAL_NOTIFICATIONS,
   INITIAL_INVENTORY
 } from '../data/mockData';
+import { soundManager } from '../utils/audioAlert';
 
 interface ToastInfo {
   id: string;
@@ -33,6 +34,10 @@ interface AppContextType {
   isAdmin: boolean;
   activeTab: NavigationTab;
   toasts: ToastInfo[];
+  isSoundEnabled: boolean;
+  toggleSound: () => void;
+  isLiveSimulationActive: boolean;
+  toggleLiveSimulation: () => void;
   
   // Navigation & View Controls
   setActiveTab: (tab: NavigationTab) => void;
@@ -134,6 +139,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
+  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(true);
+  const [isLiveSimulationActive, setIsLiveSimulationActive] = useState<boolean>(false);
+  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Toggle sound
+  const toggleSound = () => {
+    const nextState = soundManager.toggleSound();
+    setIsSoundEnabled(nextState);
+    if (nextState) {
+      soundManager.playNotificationChime();
+      showToast('info', 'Alert Sound Enabled', 'Urgent notifications will now play an audible chime.');
+    } else {
+      showToast('info', 'Alert Sound Muted', 'Audible alert chimes have been muted.');
+    }
+  };
+
+  // Toggle periodic live simulation
+  const toggleLiveSimulation = () => {
+    setIsLiveSimulationActive((prev) => {
+      const next = !prev;
+      if (next) {
+        showToast('emergency', '🔴 Live Broadcast Simulation ON', 'Periodic simulated urgent emergency alerts will stream in automatically.');
+      } else {
+        showToast('info', 'Simulation Paused', 'Live automatic emergency streaming paused.');
+      }
+      return next;
+    });
+  };
+
+  // Live simulation timer
+  useEffect(() => {
+    if (isLiveSimulationActive) {
+      simIntervalRef.current = setInterval(() => {
+        simulateIncomingEmergency();
+      }, 35000);
+    } else if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+      simIntervalRef.current = null;
+    }
+    return () => {
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current);
+      }
+    };
+  }, [isLiveSimulationActive]);
 
   // Modals
   const [activeRespondRequest, setActiveRespondRequest] = useState<BloodRequest | null>(null);
@@ -204,9 +254,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const showToast = (type: ToastInfo['type'], title: string, message: string) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     setToasts((prev) => [...prev, { id, type, title, message }]);
+    
+    // Play appropriate sound chime
+    if (type === 'emergency') {
+      soundManager.playUrgentAlertChime();
+    } else if (type === 'success') {
+      soundManager.playNotificationChime();
+    }
+
     setTimeout(() => {
       dismissToast(id);
-    }, 4500);
+    }, 5500);
   };
 
   const dismissToast = (id: string) => {
@@ -535,6 +593,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedDonorContact,
         resetToDemoData,
         simulateIncomingEmergency,
+        isSoundEnabled,
+        toggleSound,
+        isLiveSimulationActive,
+        toggleLiveSimulation,
       }}
     >
       {children}

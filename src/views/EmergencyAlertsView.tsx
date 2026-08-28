@@ -15,7 +15,10 @@ import {
   Users,
   Search,
   Check,
-  Share2
+  Share2,
+  Volume2,
+  VolumeX,
+  Radio
 } from 'lucide-react';
 import { MAJOR_CITIES } from '../data/mockData';
 
@@ -27,6 +30,10 @@ export const EmergencyAlertsView: React.FC = () => {
     markRequestFulfilled,
     showToast,
     setActiveTab,
+    isSoundEnabled,
+    toggleSound,
+    isLiveSimulationActive,
+    toggleLiveSimulation,
   } = useApp();
 
   const [levelFilter, setLevelFilter] = useState<EmergencyLevel | 'All'>('All');
@@ -80,19 +87,42 @@ export const EmergencyAlertsView: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={toggleSound}
+              className={`px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all border ${
+                isSoundEnabled ? 'bg-red-800/80 hover:bg-red-800 text-white border-white/20' : 'bg-red-950/60 text-rose-200 border-white/10'
+              }`}
+              title={isSoundEnabled ? 'Mute Alert Sound Chimes' : 'Enable Alert Sound Chimes'}
+            >
+              {isSoundEnabled ? <Volume2 className="w-4 h-4 text-rose-200" /> : <VolumeX className="w-4 h-4 text-rose-300" />}
+              <span>{isSoundEnabled ? 'Sound: ON' : 'Muted'}</span>
+            </button>
+
+            <button
+              onClick={toggleLiveSimulation}
+              className={`px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all border ${
+                isLiveSimulationActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400' : 'bg-red-800/80 hover:bg-red-800 text-white border-white/20'
+              }`}
+              title="Automatically stream simulated urgent emergencies every 35s"
+            >
+              <Radio className={`w-3.5 h-3.5 ${isLiveSimulationActive ? 'animate-pulse' : ''}`} />
+              <span>{isLiveSimulationActive ? 'Auto-Stream: ON' : 'Auto-Stream'}</span>
+            </button>
+
             <button
               onClick={simulateIncomingEmergency}
               className="px-4 py-2.5 rounded-xl bg-white text-red-700 font-extrabold text-xs shadow-md hover:bg-rose-50 transition-all flex items-center gap-1.5"
             >
-              <Sparkles className="w-4 h-4" />
-              Simulate Emergency SOS
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              Simulate SOS Alert
             </button>
+            
             <button
               onClick={() => setActiveTab('request-blood')}
               className="px-4 py-2.5 rounded-xl bg-red-900/70 hover:bg-red-900 text-white font-bold text-xs border border-white/20 transition-all"
             >
-              + Post New Request
+              + Post Request
             </button>
           </div>
         </div>
