@@ -15,6 +15,9 @@ export const DonorContactModal: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const rawDigits = selectedDonorContact.phone.replace(/\D/g, '');
+  const whatsappNum = rawDigits.startsWith('91') ? rawDigits : `91${rawDigits}`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 my-8">
@@ -37,12 +40,12 @@ export const DonorContactModal: React.FC = () => {
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold text-white">{selectedDonorContact.name}</h3>
                 {selectedDonorContact.verified && (
-                  <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-300" title="Verified Indian Donor" />
                 )}
               </div>
               <p className="text-xs text-rose-100 flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3" />
-                {selectedDonorContact.location}, {selectedDonorContact.city}
+                {selectedDonorContact.location}, {selectedDonorContact.city} {selectedDonorContact.state ? `(${selectedDonorContact.state})` : ''}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-md bg-white text-red-700 font-extrabold text-xs shadow-xs">
@@ -64,7 +67,7 @@ export const DonorContactModal: React.FC = () => {
         <div className="p-6 space-y-4">
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Direct Phone Line</span>
+              <span>Direct Emergency Mobile (India +91)</span>
               <button
                 onClick={handleCopyPhone}
                 className="text-red-600 hover:text-red-700 flex items-center gap-1 font-medium text-xs"
@@ -84,31 +87,33 @@ export const DonorContactModal: React.FC = () => {
             </p>
           )}
 
-          {/* Quick Actions */}
+          {/* Quick Actions (Call, WhatsApp, SMS) */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <a
               href={`tel:${selectedDonorContact.phone}`}
               className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md shadow-red-500/20 transition-all text-center"
             >
               <Phone className="w-4 h-4" />
-              Call Now
+              Call (+91)
             </a>
 
             <a
-              href={`sms:${selectedDonorContact.phone}?body=Hello%20${encodeURIComponent(selectedDonorContact.name)},%20I%20found%20your%20profile%20on%20LifeLink%20for%20urgent%20${encodeURIComponent(selectedDonorContact.bloodGroup)}%20blood%20donation.`}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm transition-all text-center"
+              href={`https://wa.me/${whatsappNum}?text=${encodeURIComponent(`Hello ${selectedDonorContact.name}, reaching out via LifeLink India regarding urgent ${selectedDonorContact.bloodGroup} blood donation.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md shadow-emerald-500/20 transition-all text-center"
             >
               <MessageSquare className="w-4 h-4" />
-              Send SMS
+              WhatsApp
             </a>
           </div>
 
           <a
-            href={`mailto:${selectedDonorContact.email}?subject=LifeLink%20Blood%20Donation%20Request%20(${selectedDonorContact.bloodGroup})&body=Dear%20${encodeURIComponent(selectedDonorContact.name)},%0A%0AWe%20are%20reaching%20out%20via%20LifeLink%20regarding%20an%20urgent%20blood%20need%20for%20a%20patient.`}
+            href={`sms:${selectedDonorContact.phone}?body=Hello%20${encodeURIComponent(selectedDonorContact.name)},%20urgent%20blood%20request%20via%20LifeLink%20India%20for%20${encodeURIComponent(selectedDonorContact.bloodGroup)}.`}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 font-medium text-xs transition-colors text-center"
           >
-            <Mail className="w-4 h-4 text-slate-500" />
-            Send Email ({selectedDonorContact.email})
+            <MessageSquare className="w-4 h-4 text-slate-500" />
+            Send Direct SMS ({selectedDonorContact.phone})
           </a>
 
           <div className="text-[11px] text-slate-400 text-center pt-2">

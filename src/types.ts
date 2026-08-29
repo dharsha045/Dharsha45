@@ -12,7 +12,9 @@ export interface Donor {
   bloodGroup: BloodGroup;
   phone: string;
   email: string;
+  state?: string;
   city: string;
+  pinCode?: string;
   location: string;
   lastDonationDate: string; // YYYY-MM-DD or 'Never'
   isAvailable: boolean;
@@ -37,7 +39,9 @@ export interface BloodRequest {
   unitsNeeded: number;
   hospitalName: string;
   location: string;
+  state?: string;
   city: string;
+  pinCode?: string;
   contactNumber: string;
   alternateContact?: string;
   requiredDate: string; // YYYY-MM-DD or datetime string
@@ -62,6 +66,7 @@ export interface DonationRecord {
   donorName: string;
   donationDate: string;
   hospitalName: string;
+  state?: string;
   city: string;
   bloodGroup: BloodGroup;
   units: number;
@@ -90,7 +95,25 @@ export type NavigationTab =
   | 'donor-dashboard' 
   | 'admin-dashboard'
   | 'compatibility-guide'
-  | 'eligibility-checker';
+  | 'eligibility-checker'
+  | 'about'
+  | 'download-apk';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  authMethod: 'email' | 'mobile';
+  email?: string;
+  mobile?: string;
+  bloodGroup?: BloodGroup;
+  role: 'donor' | 'requester' | 'admin';
+  city?: string;
+  state?: string;
+  avatar?: string;
+  createdAt: string;
+  isDonorProfileLinked?: boolean;
+  donorId?: string;
+}
 
 export interface BloodInventoryItem {
   bloodGroup: BloodGroup;

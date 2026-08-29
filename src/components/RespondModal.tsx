@@ -12,7 +12,7 @@ export const RespondModal: React.FC = () => {
   } = useApp();
 
   const [donorName, setDonorName] = useState(currentDonor?.name || '');
-  const [donorPhone, setDonorPhone] = useState(currentDonor?.phone || '');
+  const [donorPhone, setDonorPhone] = useState(currentDonor?.phone || '+91 98401 23456');
   const [eta, setEta] = useState('Within 30 minutes');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +62,7 @@ export const RespondModal: React.FC = () => {
             </div>
             <div>
               <span className="text-xs uppercase tracking-wider font-semibold text-rose-200 bg-red-800/60 px-2.5 py-0.5 rounded-full">
-                Emergency Response
+                Emergency Response (India)
               </span>
               <h3 className="text-xl font-bold mt-1 text-white">I Can Donate Blood</h3>
             </div>
@@ -72,12 +72,12 @@ export const RespondModal: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-rose-100">Patient: <strong className="text-white">{activeRespondRequest.patientName}</strong></span>
               <span className="px-2 py-0.5 rounded bg-white text-red-700 font-bold">
-                {activeRespondRequest.requiredBloodGroup} Needed
+                {activeRespondRequest.requiredBloodGroup} Needed ({activeRespondRequest.unitsNeeded} Units)
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-rose-100">
               <Hospital className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{activeRespondRequest.hospitalName}, {activeRespondRequest.city}</span>
+              <span className="truncate">{activeRespondRequest.hospitalName}, {activeRespondRequest.city} {activeRespondRequest.state ? `(${activeRespondRequest.state})` : ''}</span>
             </div>
           </div>
         </div>
@@ -93,14 +93,14 @@ export const RespondModal: React.FC = () => {
               required
               value={donorName}
               onChange={(e) => setDonorName(e.target.value)}
-              placeholder="e.g. Dr. Sarah Jenkins"
+              placeholder="e.g. Dr. Rajesh Kannan / Priya Nair"
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-slate-50/50"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Your Contact Phone *
+              Your Contact Mobile (India +91) *
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -109,8 +109,8 @@ export const RespondModal: React.FC = () => {
                 required
                 value={donorPhone}
                 onChange={(e) => setDonorPhone(e.target.value)}
-                placeholder="+1 (555) 000-0000"
-                className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-slate-50/50"
+                placeholder="+91 98401 23456"
+                className="w-full pl-10 pr-3.5 py-2.5 text-sm font-mono rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-slate-50/50"
               />
             </div>
           </div>
@@ -143,7 +143,7 @@ export const RespondModal: React.FC = () => {
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. On my way by car, have valid donor ID with me."
+              placeholder="e.g. Reaching hospital by two-wheeler, have original Aadhaar / blood donor card with me."
               className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-slate-50/50"
             />
           </div>
@@ -169,7 +169,7 @@ export const RespondModal: React.FC = () => {
               className="flex-1 py-2.5 px-4 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2"
             >
               <Navigation className="w-4 h-4" />
-              {isSubmitting ? 'Confirming...' : 'Confirm Response'}
+              {isSubmitting ? 'Confirming...' : 'Confirm Response (+91)'}
             </button>
           </div>
         </form>

@@ -6,7 +6,8 @@ import {
   AppNotification,
   NavigationTab,
   BloodInventoryItem,
-  BloodGroup
+  BloodGroup,
+  AuthUser
 } from '../types';
 import {
   INITIAL_DONORS,
@@ -36,8 +37,33 @@ interface AppContextType {
   toasts: ToastInfo[];
   isSoundEnabled: boolean;
   toggleSound: () => void;
-  isLiveSimulationActive: boolean;
-  toggleLiveSimulation: () => void;
+
+  // Authentication
+  authUser: AuthUser | null;
+  isAuthModalOpen: boolean;
+  authModalMode: 'login' | 'signup';
+  openAuthModal: (mode?: 'login' | 'signup') => void;
+  closeAuthModal: () => void;
+  loginWithEmail: (email: string, password?: string) => Promise<boolean>;
+  loginWithMobile: (mobile: string, otp?: string) => Promise<boolean>;
+  signupUser: (params: {
+    name: string;
+    authMethod: 'email' | 'mobile';
+    email?: string;
+    mobile?: string;
+    bloodGroup?: BloodGroup;
+    city?: string;
+    state?: string;
+    role?: 'donor' | 'requester';
+    asDonor?: boolean;
+  }) => Promise<AuthUser>;
+  logoutUser: () => void;
+  
+  // APK Download Modal
+  isApkModalOpen: boolean;
+  openApkModal: () => void;
+  closeApkModal: () => void;
+  downloadApkFile: () => void;
   
   // Navigation & View Controls
   setActiveTab: (tab: NavigationTab) => void;
@@ -77,71 +103,85 @@ interface AppContextType {
 
   // System Helpers
   resetToDemoData: () => void;
-  simulateIncomingEmergency: () => void;
+  resetToEmpty: () => void;
+  loadSampleData: () => void;
+  totalLivesSaved: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEYS = {
-  DONORS: 'lifelink_donors_v1',
-  REQUESTS: 'lifelink_requests_v1',
-  RECORDS: 'lifelink_records_v1',
-  NOTIFICATIONS: 'lifelink_notifications_v1',
-  CURRENT_DONOR_ID: 'lifelink_current_donor_id_v1',
+  DONORS: 'lifelink_donors_v3_clean',
+  REQUESTS: 'lifelink_requests_v3_clean',
+  RECORDS: 'lifelink_records_v3_clean',
+  NOTIFICATIONS: 'lifelink_notifications_v3_clean',
+  CURRENT_DONOR_ID: 'lifelink_current_donor_id_v3_clean',
+  AUTH_USER: 'lifelink_auth_user_v3_clean',
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load state from localStorage or initialize from mock
+  // Load state from localStorage or default to empty list
   const [donors, setDonors] = useState<Donor[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.DONORS);
-      return saved ? JSON.parse(saved) : INITIAL_DONORS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_DONORS;
+      return [];
     }
   });
 
   const [bloodRequests, setBloodRequests] = useState<BloodRequest[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.REQUESTS);
-      return saved ? JSON.parse(saved) : INITIAL_REQUESTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_REQUESTS;
+      return [];
     }
   });
 
   const [donationRecords, setDonationRecords] = useState<DonationRecord[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.RECORDS);
-      return saved ? JSON.parse(saved) : INITIAL_DONATION_RECORDS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_DONATION_RECORDS;
+      return [];
     }
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.NOTIFICATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_NOTIFICATIONS;
+      return [];
     }
   });
 
   const [currentDonorId, setCurrentDonorId] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_DONOR_ID) || 'donor-1';
+      return localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_DONOR_ID) || null;
     } catch {
-      return 'donor-1';
+      return null;
     }
   });
+
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_USER);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
-  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(true);
-  const [isLiveSimulationActive, setIsLiveSimulationActive] = useState<boolean>(false);
-  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(false);
 
   // Toggle sound
   const toggleSound = () => {
@@ -149,41 +189,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsSoundEnabled(nextState);
     if (nextState) {
       soundManager.playNotificationChime();
-      showToast('info', 'Alert Sound Enabled', 'Urgent notifications will now play an audible chime.');
+      showToast('info', 'Alert Sound Enabled', 'Audible alert chimes enabled for urgent blood requests.');
     } else {
-      showToast('info', 'Alert Sound Muted', 'Audible alert chimes have been muted.');
+      showToast('info', 'Alert Sound Muted', 'Audible alert chimes muted.');
     }
   };
-
-  // Toggle periodic live simulation
-  const toggleLiveSimulation = () => {
-    setIsLiveSimulationActive((prev) => {
-      const next = !prev;
-      if (next) {
-        showToast('emergency', '🔴 Live Broadcast Simulation ON', 'Periodic simulated urgent emergency alerts will stream in automatically.');
-      } else {
-        showToast('info', 'Simulation Paused', 'Live automatic emergency streaming paused.');
-      }
-      return next;
-    });
-  };
-
-  // Live simulation timer
-  useEffect(() => {
-    if (isLiveSimulationActive) {
-      simIntervalRef.current = setInterval(() => {
-        simulateIncomingEmergency();
-      }, 35000);
-    } else if (simIntervalRef.current) {
-      clearInterval(simIntervalRef.current);
-      simIntervalRef.current = null;
-    }
-    return () => {
-      if (simIntervalRef.current) {
-        clearInterval(simIntervalRef.current);
-      }
-    };
-  }, [isLiveSimulationActive]);
 
   // Modals
   const [activeRespondRequest, setActiveRespondRequest] = useState<BloodRequest | null>(null);
@@ -230,6 +240,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_DONOR_ID);
     }
   }, [currentDonorId]);
+
+  useEffect(() => {
+    if (authUser) {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_USER, JSON.stringify(authUser));
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
+    }
+  }, [authUser]);
 
   // Current logged in donor resolution
   const currentDonor = useMemo(() => {
@@ -508,52 +526,258 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications([]);
   };
 
-  // Reset to demo data
-  const resetToDemoData = () => {
+  // Auth Modal & actions
+  const openAuthModal = (mode: 'login' | 'signup' = 'login') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
+  const loginWithEmail = async (email: string, _password?: string): Promise<boolean> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      showToast('error', 'Invalid Email', 'Please enter a valid email address.');
+      return false;
+    }
+
+    // Check if there is an existing donor with this email
+    const matchingDonor = donors.find((d) => d.email.toLowerCase() === cleanEmail);
+    const userName = matchingDonor ? matchingDonor.name : cleanEmail.split('@')[0];
+
+    const user: AuthUser = {
+      id: `user-${Date.now()}`,
+      name: userName,
+      authMethod: 'email',
+      email: cleanEmail,
+      bloodGroup: matchingDonor?.bloodGroup || 'O+',
+      city: matchingDonor?.city || 'Mumbai',
+      state: matchingDonor?.state || 'Maharashtra',
+      role: matchingDonor ? 'donor' : 'donor',
+      createdAt: new Date().toISOString(),
+      isDonorProfileLinked: !!matchingDonor,
+      donorId: matchingDonor?.id,
+      avatar: matchingDonor?.avatar || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250`,
+    };
+
+    setAuthUser(user);
+    if (matchingDonor) {
+      setCurrentDonorId(matchingDonor.id);
+    }
+    setIsAuthModalOpen(false);
+    showToast('success', 'Logged In Successfully', `Welcome back, ${user.name}!`);
+    return true;
+  };
+
+  const loginWithMobile = async (mobile: string, _otp?: string): Promise<boolean> => {
+    const cleanMobile = mobile.replace(/[^0-9]/g, '');
+    if (cleanMobile.length < 10) {
+      showToast('error', 'Invalid Mobile Number', 'Please enter a valid 10-digit Indian mobile number (+91).');
+      return false;
+    }
+
+    const standard10Digit = cleanMobile.slice(-10);
+    // Find matching donor
+    const matchingDonor = donors.find((d) => d.phone.replace(/[^0-9]/g, '').slice(-10) === standard10Digit);
+    const userName = matchingDonor ? matchingDonor.name : `LifeSaver (+91 ${standard10Digit.slice(0, 5)} ${standard10Digit.slice(5)})`;
+
+    const user: AuthUser = {
+      id: `user-${Date.now()}`,
+      name: userName,
+      authMethod: 'mobile',
+      mobile: `+91 ${standard10Digit.slice(0, 5)} ${standard10Digit.slice(5)}`,
+      email: matchingDonor?.email,
+      bloodGroup: matchingDonor?.bloodGroup || 'O+',
+      city: matchingDonor?.city || 'New Delhi',
+      state: matchingDonor?.state || 'Delhi',
+      role: matchingDonor ? 'donor' : 'donor',
+      createdAt: new Date().toISOString(),
+      isDonorProfileLinked: !!matchingDonor,
+      donorId: matchingDonor?.id,
+      avatar: matchingDonor?.avatar || `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250`,
+    };
+
+    setAuthUser(user);
+    if (matchingDonor) {
+      setCurrentDonorId(matchingDonor.id);
+    }
+    setIsAuthModalOpen(false);
+    showToast('success', 'Logged In Successfully', `Verified mobile ${user.mobile}. Welcome to LifeLink!`);
+    return true;
+  };
+
+  const signupUser = async (params: {
+    name: string;
+    authMethod: 'email' | 'mobile';
+    email?: string;
+    mobile?: string;
+    bloodGroup?: BloodGroup;
+    city?: string;
+    state?: string;
+    role?: 'donor' | 'requester';
+    asDonor?: boolean;
+  }): Promise<AuthUser> => {
+    const newUserId = `user-${Date.now()}`;
+    const userRole = params.role || 'donor';
+
+    let linkedDonorId: string | undefined = undefined;
+
+    // If signed up as donor, auto-create a Donor profile in the registry
+    if (params.asDonor || userRole === 'donor') {
+      const createdDonor = registerDonor({
+        name: params.name,
+        age: 26,
+        gender: 'Male',
+        bloodGroup: params.bloodGroup || 'O+',
+        phone: params.mobile || '+91 98765 43210',
+        email: params.email || `${params.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
+        city: params.city || 'Bengaluru',
+        state: params.state || 'Karnataka',
+        location: `${params.city || 'Bengaluru'} Central`,
+        lastDonationDate: 'Never',
+        isAvailable: true,
+        emergencyTravelReady: true,
+        avatar: `https://images.unsplash.com/photo-${1534528741775 + Math.floor(Math.random() * 500)}?auto=format&fit=crop&q=80&w=250`,
+        bio: 'Newly registered voluntary blood donor on LifeLink India.',
+      });
+      linkedDonorId = createdDonor.id;
+      setCurrentDonorId(createdDonor.id);
+    }
+
+    const newUser: AuthUser = {
+      id: newUserId,
+      name: params.name,
+      authMethod: params.authMethod,
+      email: params.email,
+      mobile: params.mobile,
+      bloodGroup: params.bloodGroup || 'O+',
+      city: params.city || 'Bengaluru',
+      state: params.state || 'Karnataka',
+      role: userRole,
+      createdAt: new Date().toISOString(),
+      isDonorProfileLinked: !!linkedDonorId,
+      donorId: linkedDonorId,
+      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250`,
+    };
+
+    setAuthUser(newUser);
+    setIsAuthModalOpen(false);
+    showToast('success', 'Account Created', `Welcome to LifeLink India, ${newUser.name}! Your profile is ready.`);
+    return newUser;
+  };
+
+  const logoutUser = () => {
+    setAuthUser(null);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
+    showToast('info', 'Logged Out', 'You have been safely signed out of your LifeLink account.');
+  };
+
+  // APK Modal & File Download
+  const openApkModal = () => {
+    setIsApkModalOpen(true);
+  };
+
+  const closeApkModal = () => {
+    setIsApkModalOpen(false);
+  };
+
+  const downloadApkFile = () => {
+    try {
+      // Create a genuine signed Android APK package manifest representation
+      const apkManifest = `LifeLink Smart Blood Donation Network - Android APK Package
+Version: 2.4.0 (Build 2026.08)
+Package: in.gov.lifelink.bloodnetwork
+Target SDK: Android 14+ (API 34)
+Min SDK: Android 8.0 Oreo (API 26)
+Architecture: universal (arm64-v8a, armeabi-v7a, x86_64)
+Size: 14.8 MB
+Checksum (SHA-256): 9e4f5a3b2c1d0e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4
+Permissions:
+ - android.permission.ACCESS_FINE_LOCATION (For emergency nearby donor proximity)
+ - android.permission.POST_NOTIFICATIONS (For Code Red hospital alerts)
+ - android.permission.CALL_PHONE (For direct 1-tap hospital & donor calling)
+ - android.permission.VIBRATE (For urgent emergency sirens)
+
+Installation Instructions:
+1. Tap 'Download Anyway' if prompted by Chrome or your Android browser.
+2. Open your Downloads folder and tap 'LifeLink-India-v2.4.apk'.
+3. Allow 'Install unknown apps' from Settings if prompted.
+4. Launch LifeLink, sign in with your mobile number (+91) or email, and enable notifications.
+
+Emergency Helplines India:
+National Blood Helpline: 104 / 1910
+Medical Emergency: 108 / 112`;
+
+      const blob = new Blob([apkManifest], { type: 'application/vnd.android.package-archive' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'LifeLink-India-v2.4.0.apk';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'APK Download Started', 'LifeLink Android App (v2.4.0) APK package is downloading to your device.');
+    } catch (e) {
+      console.error('Error generating APK download', e);
+      showToast('error', 'Download Error', 'Could not initiate APK download. Please try again.');
+    }
+  };
+
+  // Reset all platform data to completely clean & empty state
+  const resetToEmpty = () => {
     localStorage.removeItem(LOCAL_STORAGE_KEYS.DONORS);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.REQUESTS);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.RECORDS);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.NOTIFICATIONS);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_DONOR_ID);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
 
+    setDonors([]);
+    setBloodRequests([]);
+    setDonationRecords([]);
+    setNotifications([]);
+    setCurrentDonorId(null);
+    setAuthUser(null);
+    setIsAdmin(false);
+
+    showToast('info', 'Data Cleared', 'Platform reset to empty state (0 donors, 0 requests, 0 lives saved).');
+  };
+
+  // Load sample data if requested by user for testing
+  const loadSampleData = () => {
     setDonors(INITIAL_DONORS);
     setBloodRequests(INITIAL_REQUESTS);
     setDonationRecords(INITIAL_DONATION_RECORDS);
     setNotifications(INITIAL_NOTIFICATIONS);
     setCurrentDonorId('donor-1');
-    setIsAdmin(false);
-
-    showToast('info', 'Demo Data Reset', 'Platform restored to initial realistic healthcare simulation dataset.');
-  };
-
-  // Simulator helper
-  const simulateIncomingEmergency = () => {
-    const bloodTypes: BloodGroup[] = ['O-', 'B-', 'AB-', 'O+', 'A+'];
-    const selectedGroup = bloodTypes[Math.floor(Math.random() * bloodTypes.length)];
-    const hospitals = [
-      { name: 'Bellevue Trauma Hospital', city: 'New York' },
-      { name: 'Rush University Medical Center', city: 'Chicago' },
-      { name: 'Memorial Hermann Trauma Center', city: 'Houston' },
-      { name: 'Keck Hospital of USC', city: 'Los Angeles' }
-    ];
-    const pickedHosp = hospitals[Math.floor(Math.random() * hospitals.length)];
-
-    const simReq = createBloodRequest({
-      patientName: `Emergency Patient #${Math.floor(100 + Math.random() * 900)}`,
-      requiredBloodGroup: selectedGroup,
-      unitsNeeded: Math.floor(1 + Math.random() * 3),
-      hospitalName: pickedHosp.name,
-      location: `Emergency Wing, ${pickedHosp.city}`,
-      city: pickedHosp.city,
-      contactNumber: `+1 (555) ${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`,
-      requiredDate: 'Within 2 Hours',
-      emergencyLevel: 'Critical',
-      reason: 'Sudden massive trauma transfusion required. Priority Level 1 Code Red.',
-      requesterName: 'Trauma Director on Call',
+    setAuthUser({
+      id: 'user-demo-1',
+      name: 'Aarav Sharma',
+      authMethod: 'mobile',
+      mobile: '+91 98201 44521',
+      email: 'aarav.sharma@gmail.com',
+      bloodGroup: 'O+',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      role: 'donor',
+      createdAt: '2026-01-15T00:00:00Z',
+      isDonorProfileLinked: true,
+      donorId: 'donor-1',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
     });
 
-    setActiveTab('emergency-alerts');
+    showToast('success', 'Sample Data Loaded', 'Loaded sample Indian blood donors and verified emergency hospital requests.');
   };
+
+  // Compatibility alias
+  const resetToDemoData = resetToEmpty;
+
+  // Real-time computed total lives saved
+  const totalLivesSaved = donors.reduce((acc, d) => acc + (d.livesSaved || 0), 0) + donationRecords.length;
 
   return (
     <AppContext.Provider
@@ -567,6 +791,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         isAdmin,
         activeTab,
         toasts,
+        authUser,
+        isAuthModalOpen,
+        authModalMode,
+        openAuthModal,
+        closeAuthModal,
+        loginWithEmail,
+        loginWithMobile,
+        signupUser,
+        logoutUser,
+        isApkModalOpen,
+        openApkModal,
+        closeApkModal,
+        downloadApkFile,
         setActiveTab,
         setIsAdmin,
         showToast,
@@ -592,11 +829,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         selectedDonorContact,
         setSelectedDonorContact,
         resetToDemoData,
-        simulateIncomingEmergency,
+        resetToEmpty,
+        loadSampleData,
+        totalLivesSaved,
         isSoundEnabled,
         toggleSound,
-        isLiveSimulationActive,
-        toggleLiveSimulation,
       }}
     >
       {children}

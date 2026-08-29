@@ -10,7 +10,7 @@ import {
   Zap,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  PlusCircle,
   Filter,
   Users,
   Search,
@@ -18,7 +18,7 @@ import {
   Share2,
   Volume2,
   VolumeX,
-  Radio
+  Droplet
 } from 'lucide-react';
 import { MAJOR_CITIES } from '../data/mockData';
 
@@ -26,14 +26,11 @@ export const EmergencyAlertsView: React.FC = () => {
   const {
     bloodRequests,
     setActiveRespondRequest,
-    simulateIncomingEmergency,
     markRequestFulfilled,
     showToast,
     setActiveTab,
     isSoundEnabled,
     toggleSound,
-    isLiveSimulationActive,
-    toggleLiveSimulation,
   } = useApp();
 
   const [levelFilter, setLevelFilter] = useState<EmergencyLevel | 'All'>('All');
@@ -57,15 +54,15 @@ export const EmergencyAlertsView: React.FC = () => {
   const handleShare = (req: typeof bloodRequests[0]) => {
     if (navigator.share) {
       navigator.share({
-        title: `🚨 Emergency ${req.requiredBloodGroup} Blood Needed`,
-        text: `Urgent blood request for ${req.patientName} at ${req.hospitalName}, ${req.city}. Can you donate?`,
+        title: `🚨 Urgent ${req.requiredBloodGroup} Blood Request`,
+        text: `Blood request for ${req.patientName} at ${req.hospitalName}, ${req.city}. Can you donate?`,
         url: window.location.href,
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(
-        `🚨 EMERGENCY ${req.requiredBloodGroup} BLOOD NEEDED: ${req.patientName} at ${req.hospitalName}, ${req.city}. Contact: ${req.contactNumber}`
+        `🚨 URGENT ${req.requiredBloodGroup} BLOOD REQUEST: ${req.patientName} at ${req.hospitalName}, ${req.city}. Contact: ${req.contactNumber}`
       );
-      showToast('info', 'Alert Copied', 'Emergency broadcast details copied to clipboard.');
+      showToast('info', 'Request Copied', 'Blood request details copied to clipboard.');
     }
   };
 
@@ -76,14 +73,14 @@ export const EmergencyAlertsView: React.FC = () => {
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white p-6 sm:p-8 rounded-3xl shadow-xl shadow-red-950/20 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold uppercase tracking-wider text-rose-100">
-              <Siren className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
-              Live Emergency SOS Command Center
+              <Droplet className="w-4 h-4 fill-white" />
+              Verified Blood Requests Registry (India)
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight font-['Outfit',sans-serif]">
-              Emergency Blood Alerts
+              Emergency Blood Requests
             </h1>
             <p className="text-rose-100 text-sm max-w-xl">
-              Real-time priority feed of verified trauma center blood calls. Critical requests receive instant hospital dispatch priority.
+              Live priority feed of patient & hospital blood donation requests. Respond directly to coordinate immediate donation.
             </p>
           </div>
 
@@ -98,31 +95,13 @@ export const EmergencyAlertsView: React.FC = () => {
               {isSoundEnabled ? <Volume2 className="w-4 h-4 text-rose-200" /> : <VolumeX className="w-4 h-4 text-rose-300" />}
               <span>{isSoundEnabled ? 'Sound: ON' : 'Muted'}</span>
             </button>
-
-            <button
-              onClick={toggleLiveSimulation}
-              className={`px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all border ${
-                isLiveSimulationActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400' : 'bg-red-800/80 hover:bg-red-800 text-white border-white/20'
-              }`}
-              title="Automatically stream simulated urgent emergencies every 35s"
-            >
-              <Radio className={`w-3.5 h-3.5 ${isLiveSimulationActive ? 'animate-pulse' : ''}`} />
-              <span>{isLiveSimulationActive ? 'Auto-Stream: ON' : 'Auto-Stream'}</span>
-            </button>
-
-            <button
-              onClick={simulateIncomingEmergency}
-              className="px-4 py-2.5 rounded-xl bg-white text-red-700 font-extrabold text-xs shadow-md hover:bg-rose-50 transition-all flex items-center gap-1.5"
-            >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              Simulate SOS Alert
-            </button>
             
             <button
               onClick={() => setActiveTab('request-blood')}
-              className="px-4 py-2.5 rounded-xl bg-red-900/70 hover:bg-red-900 text-white font-bold text-xs border border-white/20 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-white text-red-700 font-extrabold text-xs shadow-md hover:bg-rose-50 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              + Post Request
+              <PlusCircle className="w-4 h-4 text-red-600" />
+              Post New Blood Request (+91)
             </button>
           </div>
         </div>
@@ -232,7 +211,37 @@ export const EmergencyAlertsView: React.FC = () => {
         </div>
 
         {/* Requests Feed Cards */}
-        {filteredRequests.length === 0 ? (
+        {bloodRequests.length === 0 ? (
+          <div className="bg-white p-12 sm:p-16 rounded-3xl border border-slate-200 text-center space-y-5 shadow-sm max-w-2xl mx-auto">
+            <div className="w-20 h-20 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-900 font-['Outfit',sans-serif]">
+                No Pending Blood Requests
+              </h3>
+              <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                All patient requests are currently fulfilled, and there are no active emergency blood calls. If you or someone you know needs urgent blood at any hospital in India, post a request right now.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setActiveTab('request-blood')}
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-red-500/25 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Post Emergency Blood Request (+91)
+              </button>
+              <button
+                onClick={() => setActiveTab('find-donor')}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-2xl transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Users className="w-4 h-4 text-slate-600" />
+                Browse Registered Donors
+              </button>
+            </div>
+          </div>
+        ) : filteredRequests.length === 0 ? (
           <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3 shadow-sm">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
             <h3 className="text-lg font-bold text-slate-900">No matching emergency alerts</h3>
@@ -246,7 +255,7 @@ export const EmergencyAlertsView: React.FC = () => {
                 setCityFilter('All Cities');
                 setStatusFilter('Open');
               }}
-              className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl"
+              className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl cursor-pointer"
             >
               Reset Filters
             </button>

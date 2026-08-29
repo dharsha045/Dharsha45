@@ -18,7 +18,6 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
     bloodRequests,
     isSoundEnabled,
     toggleSound,
-    simulateIncomingEmergency,
   } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'emergency' | 'system'>('all');
@@ -58,14 +57,14 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-sm">Live Alert Dispatch</span>
+              <span className="font-bold text-sm">Blood Request Notifications</span>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-bold">
                   {unreadCount} new
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-400">Real-time emergency updates</p>
+            <p className="text-[10px] text-slate-400">Updates on blood requests & responses</p>
           </div>
         </div>
 
@@ -89,7 +88,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
         </div>
       </div>
 
-      {/* Filter Tabs & Test trigger */}
+      {/* Filter Tabs */}
       <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-1">
           <button
@@ -116,12 +115,10 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
         </div>
 
         <button
-          onClick={simulateIncomingEmergency}
-          className="px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 transition-colors"
-          title="Simulate live emergency"
+          onClick={markAllNotificationsRead}
+          className="text-[11px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
         >
-          <Sparkles className="w-3 h-3 text-amber-500" />
-          Simulate
+          Mark all read
         </button>
       </div>
 

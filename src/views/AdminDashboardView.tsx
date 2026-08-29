@@ -34,10 +34,12 @@ export const AdminDashboardView: React.FC = () => {
     updateDonor,
     markRequestFulfilled,
     deleteBloodRequest,
-    simulateIncomingEmergency,
     showToast,
     updateInventoryUnits,
     setActiveRespondRequest,
+    resetToEmpty,
+    loadSampleData,
+    setActiveTab: setNavTab,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'donors' | 'requests' | 'inventory'>('overview');
@@ -130,18 +132,36 @@ export const AdminDashboardView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleExportJSON}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 shadow-sm transition-all flex items-center gap-2"
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 shadow-sm transition-all flex items-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Export Database (JSON)
             </button>
 
+            {donors.length === 0 && bloodRequests.length === 0 ? (
+              <button
+                onClick={loadSampleData}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                Load Sample Data
+              </button>
+            ) : (
+              <button
+                onClick={resetToEmpty}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                Clear Database (0 Records)
+              </button>
+            )}
+
             <button
-              onClick={simulateIncomingEmergency}
-              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md shadow-red-500/30 transition-all flex items-center gap-2"
+              onClick={() => setActiveTab('requests')}
+              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md shadow-red-500/30 transition-all flex items-center gap-2 cursor-pointer"
             >
-              <Siren className="w-4 h-4" />
-              Trigger Test SOS
+              <Droplet className="w-4 h-4 fill-white" />
+              Manage Blood Requests
             </button>
           </div>
         </div>
@@ -372,7 +392,48 @@ export const AdminDashboardView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredDonors.map((d) => (
+                  {filteredDonors.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <div className="space-y-3 max-w-sm mx-auto">
+                          <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p className="font-semibold text-slate-700 text-sm">No Registered Donors Found</p>
+                          <p className="text-xs text-slate-400">
+                            {donors.length === 0
+                              ? 'The donor database is currently empty. New donor signups will appear here automatically.'
+                              : 'No donors matched your filter criteria.'}
+                          </p>
+                          {donors.length === 0 ? (
+                            <div className="flex items-center justify-center gap-2 pt-1">
+                              <button
+                                onClick={() => setNavTab('register-donor')}
+                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              >
+                                + Register Donor
+                              </button>
+                              <button
+                                onClick={loadSampleData}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              >
+                                Load Sample Donors
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setDonorSearch('');
+                                setDonorBloodFilter('All');
+                              }}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredDonors.map((d) => (
                     <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-2.5">
@@ -435,7 +496,7 @@ export const AdminDashboardView: React.FC = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -494,7 +555,48 @@ export const AdminDashboardView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredRequests.map((r) => (
+                  {filteredRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <div className="space-y-3 max-w-sm mx-auto">
+                          <Droplet className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p className="font-semibold text-slate-700 text-sm">No Emergency Blood Requests</p>
+                          <p className="text-xs text-slate-400">
+                            {bloodRequests.length === 0
+                              ? 'There are no blood requests recorded in the registry right now.'
+                              : 'No requests matched your filter criteria.'}
+                          </p>
+                          {bloodRequests.length === 0 ? (
+                            <div className="flex items-center justify-center gap-2 pt-1">
+                              <button
+                                onClick={() => setNavTab('request-blood')}
+                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              >
+                                + Post Blood Request
+                              </button>
+                              <button
+                                onClick={loadSampleData}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              >
+                                Load Sample Requests
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setRequestSearch('');
+                                setRequestLevelFilter('All');
+                              }}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRequests.map((r) => (
                     <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-2">
                         <span className="font-bold text-slate-900 block">{r.patientName}</span>
@@ -558,7 +660,7 @@ export const AdminDashboardView: React.FC = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>

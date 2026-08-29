@@ -3,35 +3,37 @@ import { useApp } from '../context/AppContext';
 import { Heart, Users, Clock, ShieldCheck, Activity, Award } from 'lucide-react';
 
 export const HomeStats: React.FC = () => {
-  const { donors, bloodRequests } = useApp();
+  const { donors, bloodRequests, totalLivesSaved } = useApp();
 
-  const totalCalculatedLivesSaved = donors.reduce((acc, d) => acc + d.livesSaved, 1280);
+  const totalDonors = donors.length;
   const activeAvailableCount = donors.filter((d) => d.isAvailable).length;
-  const fulfilledCount = bloodRequests.filter((r) => r.status === 'Fulfilled').length + 84;
-  const totalRequestsCount = bloodRequests.length + 86;
-  const fulfillmentPercentage = Math.round((fulfilledCount / totalRequestsCount) * 100);
+  const openRequestsCount = bloodRequests.filter((r) => r.status === 'Open').length;
+  const fulfilledCount = bloodRequests.filter((r) => r.status === 'Fulfilled').length;
+  const totalRequestsCount = bloodRequests.length;
+  const fulfillmentPercentage =
+    totalRequestsCount > 0 ? Math.round((fulfilledCount / totalRequestsCount) * 100) : 100;
 
   const stats = [
     {
       label: 'Total Lives Saved',
-      value: totalCalculatedLivesSaved.toLocaleString(),
-      subtext: 'Verified trauma & hospital cases',
+      value: totalLivesSaved.toLocaleString(),
+      subtext: totalLivesSaved === 0 ? 'Ready to record verified donations' : 'Verified transfusions & surgeries',
       icon: Heart,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
     },
     {
-      label: 'Active Verified Donors',
-      value: `${donors.length * 100 + activeAvailableCount * 5}+`,
-      subtext: 'Ready for emergency dispatch',
+      label: 'Active Donors (India)',
+      value: totalDonors.toLocaleString(),
+      subtext: totalDonors === 0 ? 'Be the first registered life-saver' : `${activeAvailableCount} ready for dispatch`,
       icon: Users,
       color: 'text-rose-600',
       bgColor: 'bg-rose-50',
     },
     {
-      label: 'Avg. Response Time',
-      value: '14.2 min',
-      subtext: 'Rapid emergency alert matching',
+      label: 'Open Blood Requests',
+      value: openRequestsCount.toLocaleString(),
+      subtext: openRequestsCount === 0 ? 'No pending urgent shortages' : 'Awaiting donor responses',
       icon: Clock,
       color: 'text-amber-600',
       bgColor: 'bg-amber-50',
@@ -39,7 +41,7 @@ export const HomeStats: React.FC = () => {
     {
       label: 'Emergency Fulfillment',
       value: `${fulfillmentPercentage}%`,
-      subtext: 'Critical surgeries supported',
+      subtext: 'Direct volunteer response rate',
       icon: ShieldCheck,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-50',

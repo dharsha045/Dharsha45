@@ -17,8 +17,11 @@ import { BloodRequestView } from './views/BloodRequestView';
 import { EmergencyAlertsView } from './views/EmergencyAlertsView';
 import { DonorDashboardView } from './views/DonorDashboardView';
 import { AdminDashboardView } from './views/AdminDashboardView';
+import { AboutView } from './views/AboutView';
 import { BloodCompatibilityMatrix } from './components/BloodCompatibilityMatrix';
 import { DonorEligibilityQuiz } from './components/DonorEligibilityQuiz';
+import { AuthModal } from './components/AuthModal';
+import { ApkDownloadModal } from './components/ApkDownloadModal';
 
 const AppContent: React.FC = () => {
   const { activeTab } = useApp();
@@ -39,6 +42,9 @@ const AppContent: React.FC = () => {
         return <DonorDashboardView />;
       case 'admin-dashboard':
         return <AdminDashboardView />;
+      case 'about':
+      case 'download-apk':
+        return <AboutView />;
       case 'compatibility-guide':
         return (
           <div className="py-12 bg-slate-50 min-h-screen">
@@ -77,6 +83,8 @@ const AppContent: React.FC = () => {
       <Footer />
 
       {/* Global Modals & Floating Components */}
+      <AuthModal />
+      <ApkDownloadModal />
       <RespondModal />
       <CertificateModal />
       <DonorContactModal />

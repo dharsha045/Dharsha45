@@ -44,34 +44,72 @@ export const DonorDashboardView: React.FC = () => {
 
   if (!currentDonor) {
     return (
-      <div className="py-16 bg-slate-50 min-h-screen">
-        <div className="max-w-md mx-auto px-4 text-center bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-            <Heart className="w-8 h-8" />
+      <div className="py-16 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="max-w-lg w-full mx-4 text-center bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-rose-100 text-red-600 flex items-center justify-center mx-auto border border-rose-200">
+            <Heart className="w-10 h-10" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Donor Profile Login</h2>
-          <p className="text-xs text-slate-500">
-            Select a verified demo donor to test the personal donor command dashboard.
-          </p>
-          <div className="space-y-2 pt-2">
-            {donors.slice(0, 4).map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setCurrentDonor(d)}
-                className="w-full p-3 rounded-2xl border border-slate-200 hover:border-red-500 hover:bg-rose-50/50 text-left flex items-center justify-between transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <img src={d.avatar} alt={d.name} className="w-10 h-10 rounded-xl object-cover" />
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">{d.name}</h4>
-                    <p className="text-[10px] text-slate-500">{d.location}, {d.city}</p>
+          
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
+              Donor Impact Dashboard
+            </h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              {donors.length === 0
+                ? 'You haven’t registered a donor profile yet. Register in 30 seconds to track donations, view lives saved, download official certificates, and help emergency hospital patients across India.'
+                : 'Select your registered donor account or register a new voluntary donor profile to access your impact command center.'}
+            </p>
+          </div>
+
+          {donors.length > 0 && (
+            <div className="space-y-2 pt-2 text-left">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Select Registered Profile:
+              </label>
+              {donors.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setCurrentDonor(d)}
+                  className="w-full p-3.5 rounded-2xl border border-slate-200 hover:border-red-500 hover:bg-rose-50/50 flex items-center justify-between transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={d.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250'}
+                      alt={d.name}
+                      className="w-10 h-10 rounded-xl object-cover"
+                    />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">{d.name}</h4>
+                      <p className="text-[10px] text-slate-500">{d.location}, {d.city}</p>
+                    </div>
                   </div>
-                </div>
-                <span className="px-2.5 py-1 rounded-xl bg-red-600 text-white font-mono font-bold text-xs">
-                  {d.bloodGroup}
-                </span>
-              </button>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-emerald-600">
+                      {d.livesSaved || 0} lives saved
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-red-600 text-white font-mono font-bold text-xs">
+                      {d.bloodGroup}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => setActiveTab('register-donor')}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Zap className="w-4 h-4" />
+              + Register Donor Profile (+91)
+            </button>
+            <button
+              onClick={() => setActiveTab('find-donor')}
+              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Find Donors
+            </button>
           </div>
         </div>
       </div>

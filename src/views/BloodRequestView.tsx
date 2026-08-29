@@ -15,12 +15,15 @@ import {
   Sparkles,
   CheckCircle2,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Building2
 } from 'lucide-react';
-import { MAJOR_CITIES, HOSPITAL_LIST } from '../data/mockData';
+import { MAJOR_CITIES, HOSPITAL_LIST, INDIAN_STATES_AND_CITIES } from '../data/mockData';
 
 export const BloodRequestView: React.FC = () => {
   const { createBloodRequest, setActiveTab, showToast, donors } = useApp();
+
+  const indianStates = Object.keys(INDIAN_STATES_AND_CITIES);
 
   const [patientName, setPatientName] = useState('');
   const [requiredBloodGroup, setRequiredBloodGroup] = useState<BloodGroup>('O-');
@@ -28,10 +31,12 @@ export const BloodRequestView: React.FC = () => {
   const [hospitalName, setHospitalName] = useState(HOSPITAL_LIST[0]);
   const [customHospital, setCustomHospital] = useState('');
   const [useCustomHospital, setUseCustomHospital] = useState(false);
-  const [city, setCity] = useState(MAJOR_CITIES[1]);
+  const [selectedState, setSelectedState] = useState<string>('Tamil Nadu');
+  const [city, setCity] = useState<string>('Chennai');
   const [location, setLocation] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [alternateContact, setAlternateContact] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [contactDigits, setContactDigits] = useState('');
+  const [alternateDigits, setAlternateDigits] = useState('');
   const [requiredDate, setRequiredDate] = useState('Within 2 Hours (Immediate)');
   const [emergencyLevel, setEmergencyLevel] = useState<EmergencyLevel>('Critical');
   const [reason, setReason] = useState('');
@@ -41,14 +46,32 @@ export const BloodRequestView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+  const availableCities = INDIAN_STATES_AND_CITIES[selectedState] || [city];
+
+  const handleStateChange = (newState: string) => {
+    setSelectedState(newState);
+    const citiesInState = INDIAN_STATES_AND_CITIES[newState] || [];
+    if (citiesInState.length > 0) {
+      setCity(citiesInState[0]);
+    }
+  };
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!patientName.trim()) errs.patientName = 'Patient name is required';
-    if (!contactNumber.trim()) errs.contactNumber = 'Emergency contact number is required';
+    if (!patientName.trim()) errs.patientName = 'Patient full name is required';
+    
+    const cleanDigits = contactDigits.replace(/\D/g, '');
+    if (!cleanDigits || cleanDigits.length !== 10) {
+      errs.contactNumber = 'Enter a valid 10-digit Indian mobile number (+91)';
+    }
+
     if (!requesterName.trim()) errs.requesterName = 'Doctor, nurse, or family contact name is required';
-    if (useCustomHospital && !customHospital.trim()) errs.customHospital = 'Hospital name is required';
-    if (!location.trim()) errs.location = 'Hospital department / trauma room is required';
+    if (useCustomHospital && !customHospital.trim()) errs.customHospital = 'Hospital / Blood Bank name is required';
+    if (!location.trim()) errs.location = 'Hospital department, ward, or room number is required';
+    if (pinCode.trim() && pinCode.replace(/\D/g, '').length !== 6) {
+      errs.pinCode = 'Indian PIN code must be 6 digits';
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -60,11 +83,17 @@ export const BloodRequestView: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      showToast('error', 'Validation Error', 'Please complete all required fields for the blood request.');
+      showToast('error', 'Validation Error', 'Please check the Indian contact number and required fields.');
       return;
     }
 
     setIsSubmitting(true);
+
+    const cleanMain = contactDigits.replace(/\D/g, '');
+    const formattedMain = `+91 ${cleanMain.slice(0, 5)} ${cleanMain.slice(5)}`;
+
+    const cleanAlt = alternateDigits.replace(/\D/g, '');
+    const formattedAlt = cleanAlt.length === 10 ? `+91 ${cleanAlt.slice(0, 5)} ${cleanAlt.slice(5)}` : undefined;
 
     setTimeout(() => {
       const finalHospital = useCustomHospital ? customHospital : hospitalName;
@@ -75,12 +104,14 @@ export const BloodRequestView: React.FC = () => {
         unitsNeeded,
         hospitalName: finalHospital,
         location,
+        state: selectedState,
         city,
-        contactNumber,
-        alternateContact,
+        pinCode: pinCode.trim() || undefined,
+        contactNumber: formattedMain,
+        alternateContact: formattedAlt,
         requiredDate,
         emergencyLevel,
-        reason: reason.trim() || 'Urgent medical transfusion requirement.',
+        reason: reason.trim() || 'Urgent medical transfusion requirement in India.',
         requesterName,
         notes: notes.trim() || undefined,
       });
@@ -97,13 +128,13 @@ export const BloodRequestView: React.FC = () => {
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm text-center max-w-3xl mx-auto space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wider">
             <Siren className="w-3.5 h-3.5 animate-pulse" />
-            Emergency Request Dispatch
+            Emergency Request Dispatch (India)
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-['Outfit',sans-serif]">
-            Post a Blood Request
+            Post a Blood Request in India
           </h1>
           <p className="text-slate-600 text-sm">
-            Broadcast emergency requests instantly to matching volunteer donors, local trauma centers, and blood bank coordinators.
+            Broadcast emergency requests instantly to matching volunteer donors across Indian cities with direct +91 calling and WhatsApp alert dispatch.
           </p>
         </div>
 
@@ -209,7 +240,7 @@ export const BloodRequestView: React.FC = () => {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                   <span className="text-xs text-slate-500 font-semibold whitespace-nowrap">
-                    Unit(s) (approx. 450ml/unit)
+                    Unit(s) (~350-450 ml/unit)
                   </span>
                 </div>
               </div>
@@ -225,7 +256,7 @@ export const BloodRequestView: React.FC = () => {
                     onChange={(e) => setRequiredDate(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
-                    <option value="Within 2 Hours (Immediate)">Within 2 Hours (Immediate)</option>
+                    <option value="Within 2 Hours (Immediate)">Within 2 Hours (Immediate Code Red)</option>
                     <option value="Within 6 Hours (Today)">Within 6 Hours (Today)</option>
                     <option value="Today Evening (18:00 - 21:00)">Today Evening (18:00 - 21:00)</option>
                     <option value="Tomorrow Morning (08:00 - 12:00)">Tomorrow Morning (08:00 - 12:00)</option>
@@ -248,7 +279,7 @@ export const BloodRequestView: React.FC = () => {
                     required
                     value={patientName}
                     onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="e.g. Ethan Reynolds"
+                    placeholder="e.g. Master Arjun Sundaram / Sunita Verma"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
@@ -264,10 +295,50 @@ export const BloodRequestView: React.FC = () => {
                   required
                   value={requesterName}
                   onChange={(e) => setRequesterName(e.target.value)}
-                  placeholder="e.g. Dr. Arthur Mitchell (Surgeon)"
+                  placeholder="e.g. Dr. K. S. Balaji (Surgeon) / Deepak Patil (Son)"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
                 {errors.requesterName && <p className="text-xs text-rose-600 mt-1">{errors.requesterName}</p>}
+              </div>
+            </div>
+
+            {/* Indian State & City */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Indian State / UT *
+                </label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <select
+                    value={selectedState}
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    {indianStates.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  City *
+                </label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  {availableCities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -275,14 +346,14 @@ export const BloodRequestView: React.FC = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Hospital Name *
+                  Hospital / Blood Bank *
                 </label>
                 <button
                   type="button"
                   onClick={() => setUseCustomHospital(!useCustomHospital)}
                   className="text-xs text-red-600 hover:underline font-semibold"
                 >
-                  {useCustomHospital ? 'Choose from known hospitals' : 'Hospital not in list? Type name'}
+                  {useCustomHospital ? 'Choose from known medical centres' : 'Not in list? Enter hospital name'}
                 </button>
               </div>
 
@@ -292,7 +363,7 @@ export const BloodRequestView: React.FC = () => {
                   required
                   value={customHospital}
                   onChange={(e) => setCustomHospital(e.target.value)}
-                  placeholder="Enter Hospital / Trauma Center Name"
+                  placeholder="Enter Hospital / Trauma Center / Blood Bank Name"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               ) : (
@@ -313,26 +384,9 @@ export const BloodRequestView: React.FC = () => {
               )}
             </div>
 
-            {/* City & Specific Hospital Ward / Address */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  City *
-                </label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  {MAJOR_CITIES.filter((c) => c !== 'All Cities').map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
+            {/* Ward Location & PIN Code */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Hospital Ward / Room / Trauma Bay *
                 </label>
@@ -343,29 +397,47 @@ export const BloodRequestView: React.FC = () => {
                     required
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Trauma Bay 3 / ICU Floor 4"
+                    placeholder="e.g. ICU Floor 2 / Trauma Bay 3 / Blood Bank Desk"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 {errors.location && <p className="text-xs text-rose-600 mt-1">{errors.location}</p>}
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  PIN Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 600006"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+                {errors.pinCode && <p className="text-xs text-rose-600 mt-1">{errors.pinCode}</p>}
+              </div>
             </div>
 
-            {/* Contact Phones */}
+            {/* Contact Phones (+91) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Primary Emergency Contact Phone *
+                  Primary Mobile (+91) *
                 </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 focus-within:ring-2 focus-within:ring-red-500 focus-within:border-red-500">
+                  <span className="inline-flex items-center px-3.5 bg-slate-100 text-slate-700 font-bold text-sm border-r border-slate-200 select-none">
+                    🇮🇳 +91
+                  </span>
                   <input
                     type="tel"
+                    maxLength={10}
                     required
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    placeholder="+1 (555) 888-0199"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    value={contactDigits}
+                    onChange={(e) => setContactDigits(e.target.value.replace(/\D/g, ''))}
+                    placeholder="98401 99887"
+                    className="w-full px-3.5 py-2.5 bg-transparent text-sm font-mono focus:outline-none"
                   />
                 </div>
                 {errors.contactNumber && <p className="text-xs text-rose-600 mt-1">{errors.contactNumber}</p>}
@@ -373,15 +445,21 @@ export const BloodRequestView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Alternate Contact (Optional)
+                  Alternate Mobile (Optional)
                 </label>
-                <input
-                  type="tel"
-                  value={alternateContact}
-                  onChange={(e) => setAlternateContact(e.target.value)}
-                  placeholder="+1 (555) 888-0200"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
+                <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 focus-within:ring-2 focus-within:ring-red-500">
+                  <span className="inline-flex items-center px-3.5 bg-slate-100 text-slate-700 font-bold text-sm border-r border-slate-200 select-none">
+                    🇮🇳 +91
+                  </span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={alternateDigits}
+                    onChange={(e) => setAlternateDigits(e.target.value.replace(/\D/g, ''))}
+                    placeholder="98401 99888"
+                    className="w-full px-3.5 py-2.5 bg-transparent text-sm font-mono focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -394,7 +472,7 @@ export const BloodRequestView: React.FC = () => {
                 rows={2}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Highway accident severe hemorrhagic trauma. Immediate surgery scheduled."
+                placeholder="e.g. Emergency surgery / acute hemorrhagic shock / leukemia platelet requirement."
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
@@ -405,12 +483,12 @@ export const BloodRequestView: React.FC = () => {
               disabled={isSubmitting}
               className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base shadow-lg transition-all flex items-center justify-center gap-2 text-white ${
                 emergencyLevel === 'Critical'
-                  ? 'bg-red-600 hover:bg-red-700 shadow-red-500/30 ring-2 ring-red-300 animate-pulse'
+                  ? 'bg-red-600 hover:bg-red-700 shadow-red-500/30 ring-2 ring-red-300'
                   : 'bg-slate-900 hover:bg-slate-800 shadow-slate-900/20'
               }`}
             >
               <Send className="w-5 h-5" />
-              <span>{isSubmitting ? 'Broadcasting to Donors...' : 'Broadcast Emergency Blood Request'}</span>
+              <span>{isSubmitting ? 'Broadcasting to Donors in India...' : 'Broadcast Emergency Blood Request (+91)'}</span>
             </button>
           </form>
 
@@ -420,10 +498,10 @@ export const BloodRequestView: React.FC = () => {
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                  Live Emergency Feed Preview
+                  Live Emergency Feed Preview (India)
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                  <Siren className="w-3 h-3" />
+                  <Siren className="w-3.5 h-3.5" />
                   Public Alert Card
                 </span>
               </div>
@@ -449,49 +527,50 @@ export const BloodRequestView: React.FC = () => {
                   </div>
 
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                       emergencyLevel === 'Critical'
-                        ? 'bg-red-600 text-white animate-pulse'
+                        ? 'bg-red-600 text-white'
                         : emergencyLevel === 'Urgent'
-                        ? 'bg-amber-600 text-white'
+                        ? 'bg-amber-500 text-white'
                         : 'bg-blue-600 text-white'
                     }`}
                   >
-                    {emergencyLevel}
+                    {emergencyLevel} Priority
                   </span>
                 </div>
 
                 <h4 className="text-base font-bold text-slate-900">
-                  {patientName || 'Patient Name Preview'}
+                  {patientName || 'Patient Name (e.g. Master Arjun)'}
                 </h4>
-                <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                  <Hospital className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{useCustomHospital ? customHospital || 'Hospital' : hospitalName}, {city}</span>
+
+                <p className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
+                  <Hospital className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                  <span className="truncate">
+                    {useCustomHospital ? (customHospital || 'Hospital Name') : hospitalName}, {city}
+                  </span>
                 </p>
 
-                {reason && (
-                  <p className="text-xs text-slate-600 italic bg-white/80 p-2.5 rounded-xl border border-slate-200 mt-3">
-                    "{reason}"
-                  </p>
-                )}
+                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>{location || 'Trauma Bay / Ward'}</span>
+                </p>
 
-                <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                  <span>Req: {requiredDate}</span>
-                  <span className="font-bold text-red-600">Broadcast Ready</span>
+                <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-600">
+                  <span>Req. Timeline: <strong>{requiredDate}</strong></span>
+                  <span className="text-red-700 font-bold">🇮🇳 India +91</span>
                 </div>
               </div>
 
-              {/* Geo Reach Stats */}
+              {/* Matching Donors in Indian City */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-700">Target Match Radius:</span>
-                  <span className="font-extrabold text-red-600">~{potentialDonorsCount * 25 + 14} Donors in {city}</span>
+                  <span className="font-bold text-slate-700">Matching {requiredBloodGroup} Donors in {city}:</span>
+                  <span className="font-extrabold text-red-600 bg-rose-100 px-2 py-0.5 rounded-full">
+                    {potentialDonorsCount} Available
+                  </span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-red-600 h-2 rounded-full w-3/4 animate-pulse" />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  All verified registered donors matching <strong className="text-slate-800">{requiredBloodGroup}</strong> in {city} will receive an automated priority alert.
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Upon posting, automated emergency alerts and priority SMS will be routed immediately to registered voluntary lifesavers across {city}, {selectedState}.
                 </p>
               </div>
             </div>
