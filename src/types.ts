@@ -122,6 +122,9 @@ export interface BloodInventoryItem {
   urgentRequestsCount: number;
   compatibleRecipients: BloodGroup[];
   compatibleDonors: BloodGroup[];
+  unitsInStock?: number;
+  status?: string;
+  demandScore?: number | string;
 }
 
 export interface EligibilityAnswer {

@@ -54,7 +54,7 @@ export const AdminDashboardView: React.FC = () => {
   const totalRequests = bloodRequests.length;
   const openRequests = bloodRequests.filter((r) => r.status === 'Open').length;
   const criticalRequests = bloodRequests.filter((r) => r.emergencyLevel === 'Critical' && r.status === 'Open').length;
-  const totalUnitsInStock = inventory.reduce((acc, curr) => acc + curr.unitsInStock, 0);
+  const totalUnitsInStock = inventory.reduce((acc, curr) => acc + (curr.unitsInStock ?? curr.unitsAvailable ?? 0), 0);
 
   // Filtered Donors Table
   const filteredDonors = donors.filter((d) => {

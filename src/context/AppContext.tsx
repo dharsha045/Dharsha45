@@ -31,6 +31,7 @@ interface AppContextType {
   donationRecords: DonationRecord[];
   notifications: AppNotification[];
   inventory: BloodInventoryItem[];
+  updateInventoryUnits: (bloodGroup: BloodGroup, delta: number) => void;
   currentDonor: Donor | null;
   isAdmin: boolean;
   activeTab: NavigationTab;
@@ -174,6 +175,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
+  const [customInventoryUnits, setCustomInventoryUnits] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('lifelink_inventory_units_v3_clean');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
@@ -261,12 +271,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const openUrgentForGroup = bloodRequests.filter(
         (r) => r.requiredBloodGroup === item.bloodGroup && r.status === 'Open'
       ).length;
+      const units = customInventoryUnits[item.bloodGroup] !== undefined
+        ? customInventoryUnits[item.bloodGroup]
+        : item.unitsAvailable;
+      const status = units < 10 ? 'Critical Low' : units < 20 ? 'Low' : 'Optimal';
       return {
         ...item,
+        unitsAvailable: units,
+        unitsInStock: units,
+        status: status,
+        demandScore: openUrgentForGroup > 2 ? 'High' : openUrgentForGroup > 0 ? 'Moderate' : 'Stable',
         urgentRequestsCount: openUrgentForGroup,
       };
     });
-  }, [bloodRequests]);
+  }, [bloodRequests, customInventoryUnits]);
+
+  const updateInventoryUnits = (bloodGroup: BloodGroup, delta: number) => {
+    setCustomInventoryUnits((prev) => {
+      const current = prev[bloodGroup] !== undefined
+        ? prev[bloodGroup]
+        : (INITIAL_INVENTORY.find((i) => i.bloodGroup === bloodGroup)?.unitsAvailable ?? 20);
+      const nextVal = Math.max(0, current + delta);
+      const updated = { ...prev, [bloodGroup]: nextVal };
+      try {
+        localStorage.setItem('lifelink_inventory_units_v3_clean', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+    showToast('info', 'Inventory Adjusted', `Updated ${bloodGroup} reserve stock.`);
+  };
 
   // Toast dispatch
   const showToast = (type: ToastInfo['type'], title: string, message: string) => {
@@ -787,6 +822,7 @@ Medical Emergency: 108 / 112`;
         donationRecords,
         notifications,
         inventory,
+        updateInventoryUnits,
         currentDonor,
         isAdmin,
         activeTab,
