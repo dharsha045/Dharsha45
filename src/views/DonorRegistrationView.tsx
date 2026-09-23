@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { BloodGroup } from '../types';
 import {
@@ -20,18 +20,20 @@ import {
 } from 'lucide-react';
 import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
 import confetti from 'canvas-confetti';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
+import { auth, updateFirestoreUser } from '../services/firebase';
 
 export const DonorRegistrationView: React.FC = () => {
-  const { registerDonor, setActiveTab, showToast } = useApp();
+  const { registerDonor, setActiveTab, showToast, authUser, isEmailVerified, openAuthModal } = useApp();
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(authUser?.name || '');
   const [age, setAge] = useState<number>(26);
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
-  const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
-  const [phoneDigits, setPhoneDigits] = useState('');
-  const [email, setEmail] = useState('');
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [district, setDistrict] = useState<string>('');
+  const [bloodGroup, setBloodGroup] = useState<BloodGroup>(authUser?.bloodGroup || 'O+');
+  const [phoneDigits, setPhoneDigits] = useState(authUser?.phone ? authUser.phone.replace(/\D/g, '').slice(-10) : '');
+  const [email, setEmail] = useState(authUser?.email || '');
+  const [selectedState, setSelectedState] = useState<string>(authUser?.state || '');
+  const [district, setDistrict] = useState<string>(authUser?.district || '');
   const [pinCode, setPinCode] = useState('');
   const [location, setLocation] = useState('');
   const [lastDonationDate, setLastDonationDate] = useState('Never');
@@ -42,6 +44,17 @@ export const DonorRegistrationView: React.FC = () => {
   const [bio, setBio] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (authUser) {
+      if (!name && authUser.name) setName(authUser.name);
+      if (!email && authUser.email) setEmail(authUser.email);
+      if (authUser.phone && !phoneDigits) setPhoneDigits(authUser.phone.replace(/\D/g, '').slice(-10));
+      if (authUser.bloodGroup) setBloodGroup(authUser.bloodGroup);
+      if (authUser.state && !selectedState) setSelectedState(authUser.state);
+      if (authUser.district && !district) setDistrict(authUser.district);
+    }
+  }, [authUser]);
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
 
@@ -97,6 +110,18 @@ export const DonorRegistrationView: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!authUser) {
+      showToast('warning', 'Sign In Required', 'Please sign in or register before submitting your donor registration.');
+      openAuthModal('login');
+      return;
+    }
+
+    if (!isEmailVerified && authUser.loginProvider !== 'google') {
+      showToast('warning', 'Email Verification Required', 'Please verify your email before continuing.');
+      return;
+    }
+
     if (!validate()) {
       showToast('error', 'Validation Error', 'Please check the entered mobile number and required location fields.');
       return;
@@ -106,6 +131,18 @@ export const DonorRegistrationView: React.FC = () => {
 
     const cleanDigits = phoneDigits.replace(/\D/g, '');
     const formattedPhone = `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`;
+
+    // Sync with Firestore profile if user is authenticated
+    if (auth.currentUser) {
+      updateFirestoreUser(auth.currentUser.uid, {
+        name,
+        phone: formattedPhone,
+        bloodGroup,
+        state: selectedState,
+        district,
+        isDonor: true,
+      }).catch((err) => console.warn('Could not update Firestore user on donor register:', err));
+    }
 
     setTimeout(() => {
       registerDonor({
@@ -158,6 +195,9 @@ export const DonorRegistrationView: React.FC = () => {
             Join the verified nationwide emergency blood network across all Indian states and cities. Fast SMS and direct phone connectivity (+91).
           </p>
         </div>
+
+        {/* Email Verification Banner */}
+        <EmailVerificationBanner />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Main Form */}

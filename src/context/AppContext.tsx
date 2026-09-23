@@ -17,6 +17,25 @@ import {
   INITIAL_INVENTORY
 } from '../data/mockData';
 import { soundManager } from '../utils/audioAlert';
+import {
+  auth,
+  FirestoreUserData,
+  getFirestoreUser,
+  createFirestoreUser,
+  updateFirestoreUser,
+  queryFirestoreDonors,
+  formatAuthError,
+  testFirestoreConnection,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+  onAuthStateChanged,
+  reload,
+  googleProvider,
+  FirebaseUser
+} from '../services/firebase';
 
 interface ToastInfo {
   id: string;
@@ -41,24 +60,46 @@ interface AppContextType {
 
   // Authentication
   authUser: AuthUser | null;
+  firebaseUser: FirebaseUser | null;
+  isEmailVerified: boolean;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'signup';
   openAuthModal: (mode?: 'login' | 'signup') => void;
   closeAuthModal: () => void;
-  loginWithEmail: (email: string, password?: string) => Promise<boolean>;
+  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }>;
+  signupWithEmail: (params: {
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    bloodGroup: BloodGroup;
+    state: string;
+    district: string;
+  }) => Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }>;
+  loginWithGoogle: () => Promise<{ success: boolean; isNewUser?: boolean; profileComplete?: boolean; error?: string }>;
+  completeGoogleProfile: (params: {
+    phone: string;
+    bloodGroup: BloodGroup;
+    state: string;
+    district: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  resendVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
+  checkEmailVerified: () => Promise<boolean>;
   loginWithMobile: (mobile: string, otp?: string) => Promise<boolean>;
   signupUser: (params: {
     name: string;
-    authMethod: 'email' | 'mobile';
+    authMethod: 'email' | 'mobile' | 'google';
     email?: string;
     mobile?: string;
+    phone?: string;
     bloodGroup?: BloodGroup;
     city?: string;
     state?: string;
+    district?: string;
     role?: 'donor' | 'requester';
     asDonor?: boolean;
   }) => Promise<AuthUser>;
-  logoutUser: () => void;
+  logoutUser: () => Promise<void>;
   
   // APK Download Modal
   isApkModalOpen: boolean;
@@ -183,6 +224,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+
+  // Computed email verification status: true if Google sign-in or Firebase emailVerified is true
+  const isEmailVerified = useMemo(() => {
+    if (!firebaseUser) return false;
+    if (authUser?.loginProvider === 'google') return true;
+    return Boolean(firebaseUser.emailVerified || authUser?.emailVerified);
+  }, [firebaseUser, authUser]);
+
   const [customInventoryUnits, setCustomInventoryUnits] = useState<Record<string, number>>(() => {
     try {
       const saved = localStorage.getItem('lifelink_inventory_units_v3_clean');
@@ -271,6 +321,95 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
     }
   }, [authUser]);
+
+  // Firebase Auth State & Firestore Sync
+  useEffect(() => {
+    // Check connection to Firestore database per guidelines
+    testFirestoreConnection();
+
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        try {
+          const profile = await getFirestoreUser(fbUser.uid);
+          if (profile) {
+            // If user verified email in auth, sync to Firestore
+            if (fbUser.emailVerified && !profile.emailVerified) {
+              await updateFirestoreUser(fbUser.uid, { emailVerified: true }).catch(() => {});
+              profile.emailVerified = true;
+            }
+
+            const activeUser: AuthUser = {
+              id: fbUser.uid,
+              name: profile.name || fbUser.displayName || 'LifeLink Donor',
+              authMethod: profile.loginProvider === 'google' ? 'google' : 'email',
+              email: profile.email || fbUser.email || '',
+              phone: profile.phone,
+              mobile: profile.phone,
+              bloodGroup: profile.bloodGroup,
+              state: profile.state,
+              district: profile.district,
+              city: profile.district || profile.state,
+              avatar: profile.profilePhoto || fbUser.photoURL || undefined,
+              profilePhoto: profile.profilePhoto || fbUser.photoURL || undefined,
+              role: 'donor',
+              isDonor: profile.isDonor,
+              emailVerified: fbUser.emailVerified || profile.loginProvider === 'google',
+              loginProvider: profile.loginProvider,
+              createdAt: profile.createdAt,
+              isDonorProfileLinked: profile.isDonor,
+              donorId: fbUser.uid,
+            };
+            setAuthUser(activeUser);
+
+            // Sync with local donor directory
+            if (profile.isDonor) {
+              const donorEntry: Donor = {
+                id: fbUser.uid,
+                name: profile.name,
+                age: 26,
+                gender: 'Male',
+                bloodGroup: profile.bloodGroup,
+                phone: profile.phone,
+                email: profile.email,
+                state: profile.state,
+                district: profile.district,
+                city: profile.district,
+                location: `${profile.district}, ${profile.state}`,
+                lastDonationDate: 'Never',
+                isAvailable: true,
+                totalDonations: 0,
+                livesSaved: 0,
+                rating: 5.0,
+                responseTimeMinutes: 15,
+                verified: true,
+                emergencyTravelReady: true,
+                createdAt: profile.createdAt.split('T')[0],
+                avatar: profile.profilePhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profile.name)}`,
+                bio: 'Verified LifeLink blood donor'
+              };
+
+              setDonors((prev) => {
+                const exists = prev.some((d) => d.id === fbUser.uid || d.email.toLowerCase() === profile.email.toLowerCase());
+                if (exists) {
+                  return prev.map((d) => (d.id === fbUser.uid || d.email.toLowerCase() === profile.email.toLowerCase()) ? { ...d, ...donorEntry } : d);
+                }
+                return [donorEntry, ...prev];
+              });
+              setCurrentDonorId(fbUser.uid);
+            }
+          }
+        } catch (err) {
+          console.error('Error syncing auth profile from Firestore:', err);
+        }
+      } else {
+        // Logged out
+        setAuthUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Current logged in donor resolution
   const currentDonor = useMemo(() => {
@@ -584,39 +723,344 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsAuthModalOpen(false);
   };
 
-  const loginWithEmail = async (email: string, _password?: string): Promise<boolean> => {
+  const loginWithEmail = async (
+    email: string,
+    password: string = ''
+  ): Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }> => {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      showToast('error', 'Invalid Email', 'Please enter a valid email address.');
+      const err = 'Please enter a valid email address.';
+      showToast('error', 'Invalid Email', err);
+      return { success: false, error: err };
+    }
+    if (!password) {
+      const err = 'Please enter your account password.';
+      showToast('error', 'Password Required', err);
+      return { success: false, error: err };
+    }
+
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      await reload(userCred.user);
+
+      if (!userCred.user.emailVerified) {
+        showToast('warning', 'Email Verification Required', 'Please verify your email before continuing.');
+        return {
+          success: false,
+          emailVerificationPending: true,
+          error: 'Please verify your email before continuing.'
+        };
+      }
+
+      // Fetch user profile from Firestore
+      let profile = await getFirestoreUser(userCred.user.uid);
+      if (!profile) {
+        // Construct fallback user profile in Firestore
+        profile = {
+          name: userCred.user.displayName || cleanEmail.split('@')[0],
+          email: cleanEmail,
+          profilePhoto: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanEmail)}`,
+          phone: '+91 98765 43210',
+          bloodGroup: 'O+',
+          state: 'Maharashtra',
+          district: 'Mumbai',
+          isDonor: true,
+          emailVerified: true,
+          loginProvider: 'email',
+          createdAt: new Date().toISOString()
+        };
+        await createFirestoreUser(userCred.user.uid, profile);
+      } else {
+        await updateFirestoreUser(userCred.user.uid, { emailVerified: true }).catch(() => {});
+      }
+
+      const activeUser: AuthUser = {
+        id: userCred.user.uid,
+        name: profile.name,
+        authMethod: 'email',
+        email: cleanEmail,
+        phone: profile.phone,
+        mobile: profile.phone,
+        bloodGroup: profile.bloodGroup,
+        state: profile.state,
+        district: profile.district,
+        city: profile.district || profile.state,
+        avatar: profile.profilePhoto,
+        profilePhoto: profile.profilePhoto,
+        role: 'donor',
+        isDonor: profile.isDonor,
+        emailVerified: true,
+        loginProvider: 'email',
+        createdAt: profile.createdAt,
+        isDonorProfileLinked: profile.isDonor,
+        donorId: userCred.user.uid,
+      };
+
+      setAuthUser(activeUser);
+      setIsAuthModalOpen(false);
+      showToast('success', 'Logged In Successfully', `Welcome back, ${activeUser.name}!`);
+      return { success: true };
+    } catch (error: any) {
+      const formatted = formatAuthError(error);
+      showToast('error', 'Login Failed', formatted);
+      return { success: false, error: formatted };
+    }
+  };
+
+  const signupWithEmail = async (params: {
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    bloodGroup: BloodGroup;
+    state: string;
+    district: string;
+  }): Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }> => {
+    const cleanEmail = params.email.trim().toLowerCase();
+    try {
+      // 1. Create Firebase Authentication account
+      const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, params.password);
+
+      // 2. Send Firebase email verification link
+      await sendEmailVerification(userCred.user);
+
+      // 3. Format phone (+91)
+      const cleanDigits = params.phone.replace(/\D/g, '');
+      const formattedPhone = cleanDigits.length === 10
+        ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`
+        : params.phone.trim();
+
+      // 4. Create Firestore profile without storing password
+      const profile: FirestoreUserData = {
+        name: params.name.trim(),
+        email: cleanEmail,
+        profilePhoto: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(params.name.trim())}`,
+        phone: formattedPhone,
+        bloodGroup: params.bloodGroup,
+        state: params.state,
+        district: params.district,
+        isDonor: true,
+        emailVerified: false,
+        loginProvider: 'email',
+        createdAt: new Date().toISOString()
+      };
+
+      await createFirestoreUser(userCred.user.uid, profile);
+
+      showToast(
+        'info',
+        'Verification Email Sent',
+        `Please verify your email before continuing. Link sent to ${cleanEmail}`
+      );
+
+      return {
+        success: true,
+        emailVerificationPending: true
+      };
+    } catch (error: any) {
+      const formatted = formatAuthError(error);
+      showToast('error', 'Signup Failed', formatted);
+      return { success: false, error: formatted };
+    }
+  };
+
+  const loginWithGoogle = async (): Promise<{
+    success: boolean;
+    isNewUser?: boolean;
+    profileComplete?: boolean;
+    error?: string;
+  }> => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      // Check if user has an existing Firestore profile
+      const existingProfile = await getFirestoreUser(user.uid);
+
+      if (
+        existingProfile &&
+        existingProfile.phone &&
+        existingProfile.bloodGroup &&
+        existingProfile.state &&
+        existingProfile.district
+      ) {
+        const activeUser: AuthUser = {
+          id: user.uid,
+          name: existingProfile.name || user.displayName || 'LifeLink Donor',
+          authMethod: 'google',
+          email: existingProfile.email || user.email || '',
+          phone: existingProfile.phone,
+          mobile: existingProfile.phone,
+          bloodGroup: existingProfile.bloodGroup,
+          state: existingProfile.state,
+          district: existingProfile.district,
+          city: existingProfile.district || existingProfile.state,
+          avatar: existingProfile.profilePhoto || user.photoURL || undefined,
+          profilePhoto: existingProfile.profilePhoto || user.photoURL || undefined,
+          role: 'donor',
+          isDonor: existingProfile.isDonor,
+          emailVerified: true,
+          loginProvider: 'google',
+          createdAt: existingProfile.createdAt,
+          isDonorProfileLinked: existingProfile.isDonor,
+          donorId: user.uid,
+        };
+
+        setAuthUser(activeUser);
+        setIsAuthModalOpen(false);
+        showToast('success', 'Google Sign-In', `Welcome back, ${activeUser.name}!`);
+        return { success: true, isNewUser: false, profileComplete: true };
+      }
+
+      // New user or missing profile information
+      return {
+        success: true,
+        isNewUser: !existingProfile,
+        profileComplete: false
+      };
+    } catch (error: any) {
+      const formatted = formatAuthError(error);
+      showToast('error', 'Google Sign-In Failed', formatted);
+      return { success: false, error: formatted };
+    }
+  };
+
+  const completeGoogleProfile = async (params: {
+    phone: string;
+    bloodGroup: BloodGroup;
+    state: string;
+    district: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    const user = auth.currentUser;
+    if (!user) {
+      const err = 'No authenticated Google session found. Please sign in again.';
+      showToast('error', 'Session Expired', err);
+      return { success: false, error: err };
+    }
+
+    try {
+      const name = user.displayName || 'LifeLink Donor';
+      const email = (user.email || '').toLowerCase();
+      const profilePhoto = user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
+
+      const cleanDigits = params.phone.replace(/\D/g, '');
+      const formattedPhone = cleanDigits.length === 10
+        ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`
+        : params.phone.trim();
+
+      const profile: FirestoreUserData = {
+        name,
+        email,
+        profilePhoto,
+        phone: formattedPhone,
+        bloodGroup: params.bloodGroup,
+        state: params.state,
+        district: params.district,
+        isDonor: true,
+        emailVerified: true,
+        loginProvider: 'google',
+        createdAt: new Date().toISOString()
+      };
+
+      await createFirestoreUser(user.uid, profile);
+
+      const activeUser: AuthUser = {
+        id: user.uid,
+        name,
+        authMethod: 'google',
+        email,
+        phone: formattedPhone,
+        mobile: formattedPhone,
+        bloodGroup: params.bloodGroup,
+        state: params.state,
+        district: params.district,
+        city: params.district,
+        avatar: profilePhoto,
+        profilePhoto,
+        role: 'donor',
+        isDonor: true,
+        emailVerified: true,
+        loginProvider: 'google',
+        createdAt: profile.createdAt,
+        isDonorProfileLinked: true,
+        donorId: user.uid,
+      };
+
+      setAuthUser(activeUser);
+
+      // Create local donor entry
+      const donorEntry: Donor = {
+        id: user.uid,
+        name,
+        age: 26,
+        gender: 'Male',
+        bloodGroup: params.bloodGroup,
+        phone: formattedPhone,
+        email,
+        state: params.state,
+        district: params.district,
+        city: params.district,
+        location: `${params.district}, ${params.state}`,
+        lastDonationDate: 'Never',
+        isAvailable: true,
+        totalDonations: 0,
+        livesSaved: 0,
+        rating: 5.0,
+        responseTimeMinutes: 15,
+        verified: true,
+        emergencyTravelReady: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        avatar: profilePhoto,
+        bio: 'Verified LifeLink voluntary blood donor'
+      };
+
+      setDonors((prev) => [donorEntry, ...prev.filter((d) => d.id !== user.uid)]);
+      setCurrentDonorId(user.uid);
+
+      setIsAuthModalOpen(false);
+      showToast('success', 'Profile Completed', `Welcome to LifeLink, ${name}! Your profile is ready.`);
+      return { success: true };
+    } catch (error: any) {
+      const formatted = formatAuthError(error);
+      showToast('error', 'Profile Save Failed', formatted);
+      return { success: false, error: formatted };
+    }
+  };
+
+  const resendVerificationEmail = async (): Promise<{ success: boolean; error?: string }> => {
+    const user = auth.currentUser;
+    if (!user) {
+      const err = 'No active session. Please sign in first.';
+      showToast('error', 'Action Failed', err);
+      return { success: false, error: err };
+    }
+    try {
+      await sendEmailVerification(user);
+      showToast('success', 'Email Sent', `A fresh verification link has been sent to ${user.email}.`);
+      return { success: true };
+    } catch (error: any) {
+      const formatted = formatAuthError(error);
+      showToast('error', 'Could Not Resend', formatted);
+      return { success: false, error: formatted };
+    }
+  };
+
+  const checkEmailVerified = async (): Promise<boolean> => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    try {
+      await reload(user);
+      if (user.emailVerified) {
+        await updateFirestoreUser(user.uid, { emailVerified: true }).catch(() => {});
+        setAuthUser((prev) => prev ? { ...prev, emailVerified: true } : null);
+        showToast('success', 'Email Verified!', 'Your email is confirmed. Welcome to LifeLink!');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error reloading auth user:', err);
       return false;
     }
-
-    // Check if there is an existing donor with this email
-    const matchingDonor = donors.find((d) => d.email.toLowerCase() === cleanEmail);
-    const userName = matchingDonor ? matchingDonor.name : cleanEmail.split('@')[0];
-
-    const user: AuthUser = {
-      id: `user-${Date.now()}`,
-      name: userName,
-      authMethod: 'email',
-      email: cleanEmail,
-      bloodGroup: matchingDonor?.bloodGroup || 'O+',
-      city: matchingDonor?.city || 'Mumbai',
-      state: matchingDonor?.state || 'Maharashtra',
-      role: matchingDonor ? 'donor' : 'donor',
-      createdAt: new Date().toISOString(),
-      isDonorProfileLinked: !!matchingDonor,
-      donorId: matchingDonor?.id,
-      avatar: matchingDonor?.avatar || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250`,
-    };
-
-    setAuthUser(user);
-    if (matchingDonor) {
-      setCurrentDonorId(matchingDonor.id);
-    }
-    setIsAuthModalOpen(false);
-    showToast('success', 'Logged In Successfully', `Welcome back, ${user.name}!`);
-    return true;
   };
 
   const loginWithMobile = async (mobile: string, _otp?: string): Promise<boolean> => {
@@ -627,7 +1071,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     const standard10Digit = cleanMobile.slice(-10);
-    // Find matching donor
     const matchingDonor = donors.find((d) => d.phone.replace(/[^0-9]/g, '').slice(-10) === standard10Digit);
     const userName = matchingDonor ? matchingDonor.name : `LifeSaver (+91 ${standard10Digit.slice(0, 5)} ${standard10Digit.slice(5)})`;
 
@@ -658,55 +1101,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const signupUser = async (params: {
     name: string;
-    authMethod: 'email' | 'mobile';
+    authMethod: 'email' | 'mobile' | 'google';
     email?: string;
     mobile?: string;
+    phone?: string;
     bloodGroup?: BloodGroup;
     city?: string;
     state?: string;
+    district?: string;
     role?: 'donor' | 'requester';
     asDonor?: boolean;
   }): Promise<AuthUser> => {
     const newUserId = `user-${Date.now()}`;
     const userRole = params.role || 'donor';
 
-    let linkedDonorId: string | undefined = undefined;
-
-    // If signed up as donor, auto-create a Donor profile in the registry
-    if (params.asDonor || userRole === 'donor') {
-      const createdDonor = registerDonor({
-        name: params.name,
-        age: 26,
-        gender: 'Male',
-        bloodGroup: params.bloodGroup || 'O+',
-        phone: params.mobile || '+91 98765 43210',
-        email: params.email || `${params.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-        city: params.city || 'Bengaluru',
-        state: params.state || 'Karnataka',
-        location: `${params.city || 'Bengaluru'} Central`,
-        lastDonationDate: 'Never',
-        isAvailable: true,
-        emergencyTravelReady: true,
-        avatar: `https://images.unsplash.com/photo-${1534528741775 + Math.floor(Math.random() * 500)}?auto=format&fit=crop&q=80&w=250`,
-        bio: 'Newly registered voluntary blood donor on LifeLink India.',
-      });
-      linkedDonorId = createdDonor.id;
-      setCurrentDonorId(createdDonor.id);
-    }
-
     const newUser: AuthUser = {
       id: newUserId,
       name: params.name,
       authMethod: params.authMethod,
       email: params.email,
-      mobile: params.mobile,
+      mobile: params.mobile || params.phone,
+      phone: params.phone || params.mobile,
       bloodGroup: params.bloodGroup || 'O+',
-      city: params.city || 'Bengaluru',
+      city: params.district || params.city || 'Bengaluru',
+      district: params.district || params.city || 'Bengaluru',
       state: params.state || 'Karnataka',
       role: userRole,
       createdAt: new Date().toISOString(),
-      isDonorProfileLinked: !!linkedDonorId,
-      donorId: linkedDonorId,
+      isDonorProfileLinked: true,
       avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250`,
     };
 
@@ -716,10 +1138,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newUser;
   };
 
-  const logoutUser = () => {
+  const logoutUser = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error('Firebase signOut error:', e);
+    }
     setAuthUser(null);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
     showToast('info', 'Logged Out', 'You have been safely signed out of your LifeLink account.');
+    // Redirect to the existing Login page
+    openAuthModal('login');
   };
 
   // APK Modal & File Download
@@ -841,11 +1270,18 @@ Medical Emergency: 108 / 112`;
         activeTab,
         toasts,
         authUser,
+        firebaseUser,
+        isEmailVerified,
         isAuthModalOpen,
         authModalMode,
         openAuthModal,
         closeAuthModal,
         loginWithEmail,
+        signupWithEmail,
+        loginWithGoogle,
+        completeGoogleProfile,
+        resendVerificationEmail,
+        checkEmailVerified,
         loginWithMobile,
         signupUser,
         logoutUser,

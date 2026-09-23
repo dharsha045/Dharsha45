@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile in the LifeLink blood donation network",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "profilePhoto": {
+          "type": "string",
+          "description": "URL of user profile photo"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number"
+        },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+          "description": "Blood group of the user"
+        },
+        "state": {
+          "type": "string",
+          "description": "State or Union Territory in India"
+        },
+        "district": {
+          "type": "string",
+          "description": "District within the State/UT"
+        },
+        "isDonor": {
+          "type": "boolean",
+          "description": "Whether user is enrolled as an active voluntary donor"
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Whether email is verified in Firebase Auth"
+        },
+        "loginProvider": {
+          "type": "string",
+          "enum": ["email", "google"],
+          "description": "Authentication provider method"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of account creation"
+        }
+      },
+      "required": ["name", "email", "phone", "bloodGroup", "state", "district", "isDonor", "loginProvider", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores individual LifeLink user profiles keyed by their Firebase Auth UID"
+    }
+  }
+}

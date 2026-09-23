@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      // Users can read their own profile, or authenticated users can search voluntary donors
+      allow read: if isOwner(userId) || (isAuthenticated() && resource.data.isDonor == true);
+
+      // Users can create their own profile with their UID
+      allow create: if isOwner(userId);
+
+      // Users can update their own profile
+      allow update: if isOwner(userId);
+
+      // Deletion allowed only by owner
+      allow delete: if isOwner(userId);
+    }
+  }
+}

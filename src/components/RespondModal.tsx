@@ -9,10 +9,14 @@ export const RespondModal: React.FC = () => {
     setActiveRespondRequest,
     currentDonor,
     respondToRequest,
+    authUser,
+    isEmailVerified,
+    openAuthModal,
+    showToast,
   } = useApp();
 
-  const [donorName, setDonorName] = useState(currentDonor?.name || '');
-  const [donorPhone, setDonorPhone] = useState(currentDonor?.phone || '+91 98401 23456');
+  const [donorName, setDonorName] = useState(authUser?.name || currentDonor?.name || '');
+  const [donorPhone, setDonorPhone] = useState(authUser?.phone || currentDonor?.phone || '+91 98401 23456');
   const [eta, setEta] = useState('Within 30 minutes');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,6 +25,18 @@ export const RespondModal: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!authUser) {
+      showToast('warning', 'Sign In Required', 'Please sign in to respond to emergency blood requests.');
+      openAuthModal('login');
+      return;
+    }
+
+    if (!isEmailVerified && authUser.loginProvider !== 'google') {
+      showToast('warning', 'Email Verification Required', 'Please verify your email before continuing.');
+      return;
+    }
+
     if (!donorName.trim() || !donorPhone.trim()) return;
 
     setIsSubmitting(true);

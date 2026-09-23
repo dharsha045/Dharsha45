@@ -105,15 +105,20 @@ export type NavigationTab =
 export interface AuthUser {
   id: string;
   name: string;
-  authMethod: 'email' | 'mobile';
+  authMethod: 'email' | 'google' | 'mobile';
   email?: string;
   mobile?: string;
+  phone?: string;
   bloodGroup?: BloodGroup;
   role: 'donor' | 'requester' | 'admin';
   city?: string;
   district?: string;
   state?: string;
   avatar?: string;
+  profilePhoto?: string;
+  isDonor?: boolean;
+  emailVerified?: boolean;
+  loginProvider?: 'email' | 'google';
   createdAt: string;
   isDonorProfileLinked?: boolean;
   donorId?: string;

@@ -1,39 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { BloodGroup } from '../types';
 import {
   X,
-  Phone,
   Mail,
   Lock,
   User,
-  MapPin,
-  Heart,
+  Phone,
   Droplet,
+  Heart,
   ShieldCheck,
-  Sparkles,
-  ArrowRight,
+  AlertCircle,
   CheckCircle2,
-  KeyRound,
-  AlertCircle
+  RefreshCw,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ExternalLink
 } from 'lucide-react';
+import { LocationSelector } from './LocationSelector';
+import { auth } from '../services/firebase';
 
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-const INDIAN_CITIES = [
-  'Mumbai',
-  'Delhi NCR',
-  'Bengaluru',
-  'Hyderabad',
-  'Chennai',
-  'Kolkata',
-  'Pune',
-  'Ahmedabad',
-  'Jaipur',
-  'Lucknow',
-  'Chandigarh',
-  'Kochi'
-];
+const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.35 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
 
 export const AuthModal: React.FC = () => {
   const {
@@ -42,127 +51,243 @@ export const AuthModal: React.FC = () => {
     authModalMode,
     openAuthModal,
     loginWithEmail,
-    loginWithMobile,
-    signupUser,
+    signupWithEmail,
+    loginWithGoogle,
+    completeGoogleProfile,
+    resendVerificationEmail,
+    checkEmailVerified,
     showToast,
+    setActiveTab,
   } = useApp();
 
-  // Mode: 'login' | 'signup'
-  const isSignup = authModalMode === 'signup';
-
-  // Method: 'mobile' | 'email'
-  const [method, setMethod] = useState<'mobile' | 'email'>('mobile');
+  // Internal view steps:
+  // 'auth': standard login / signup view
+  // 'verification_pending': show email verification screen
+  // 'google_complete_profile': show missing LifeLink fields for new Google user
+  const [viewStep, setViewStep] = useState<'auth' | 'verification_pending' | 'google_complete_profile'>('auth');
 
   // Form states
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [emailAddress, setEmailAddress] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
-  const [city, setCity] = useState('Mumbai');
-  const [asDonor, setAsDonor] = useState(true);
+  const [selectedState, setSelectedState] = useState('');
+  const [district, setDistrict] = useState('');
 
-  // OTP simulation for mobile
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [simulatedOtp] = useState('9482');
+  // UI status states
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  const isSignup = authModalMode === 'signup';
+
+  // Sync / Reset on modal open or mode change
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      setErrorMsg('');
+      setSuccessMsg('');
+      if (viewStep !== 'google_complete_profile') {
+        setViewStep('auth');
+      }
+    }
+  }, [isAuthModalOpen, authModalMode]);
+
+  // Handle resend countdown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   if (!isAuthModalOpen) return null;
 
-  const handleSendOtp = () => {
-    const clean = mobileNumber.replace(/[^0-9]/g, '');
-    if (clean.length < 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
-      return;
-    }
-    setErrorMsg('');
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setOtpSent(true);
-      showToast('info', 'OTP Sent', `Simulated SMS OTP sent to +91 ${clean.slice(-10)}. Code is: ${simulatedOtp}`);
-    }, 600);
-  };
-
-  const handleMobileSubmit = async (e: React.FormEvent) => {
+  // Handle Email + Password Login
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
-    if (!otpSent) {
-      handleSendOtp();
-      return;
-    }
-
-    if (otpCode.trim() !== simulatedOtp && otpCode.trim().length !== 4) {
-      setErrorMsg(`Invalid verification code. Enter the 4-digit code (e.g. ${simulatedOtp}).`);
-      return;
-    }
-
-    setLoading(true);
-    if (isSignup) {
-      if (!fullName.trim()) {
-        setErrorMsg('Please enter your full name.');
-        setLoading(false);
-        return;
-      }
-      await signupUser({
-        name: fullName.trim(),
-        authMethod: 'mobile',
-        mobile: `+91 ${mobileNumber.replace(/[^0-9]/g, '').slice(-10)}`,
-        bloodGroup,
-        city,
-        asDonor,
-      });
-    } else {
-      await loginWithMobile(mobileNumber, otpCode);
-    }
-    setLoading(false);
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (!emailAddress.includes('@') || !emailAddress.includes('.')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setErrorMsg('Please enter a valid email address.');
       return;
     }
+    if (!password) {
+      setErrorMsg('Please enter your account password.');
+      return;
+    }
 
     setLoading(true);
-    if (isSignup) {
-      if (!fullName.trim()) {
-        setErrorMsg('Please enter your full name.');
-        setLoading(false);
-        return;
-      }
-      await signupUser({
-        name: fullName.trim(),
-        authMethod: 'email',
-        email: emailAddress.trim().toLowerCase(),
-        bloodGroup,
-        city,
-        asDonor,
-      });
-    } else {
-      await loginWithEmail(emailAddress, password);
-    }
+    const res = await loginWithEmail(cleanEmail, password);
     setLoading(false);
+
+    if (res.success) {
+      closeAuthModal();
+      setActiveTab('home');
+    } else if (res.emailVerificationPending) {
+      setPendingVerificationEmail(cleanEmail);
+      setViewStep('verification_pending');
+      setErrorMsg('Please verify your email before continuing.');
+    } else if (res.error) {
+      setErrorMsg(res.error);
+    }
   };
 
-  const handleQuickDemoLogin = (type: 'donor' | 'requester') => {
-    if (type === 'donor') {
-      loginWithMobile('9820144521');
+  // Handle Email + Password Signup
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanDigits = phoneDigits.replace(/\D/g, '');
+
+    if (!fullName.trim()) {
+      setErrorMsg('Please enter your full name.');
+      return;
+    }
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+    if (cleanDigits.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number (+91).');
+      return;
+    }
+    if (!selectedState) {
+      setErrorMsg('Please select your State / Union Territory.');
+      return;
+    }
+    if (!district) {
+      setErrorMsg('Please select your District.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await signupWithEmail({
+      name: fullName.trim(),
+      email: cleanEmail,
+      password,
+      phone: `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`,
+      bloodGroup,
+      state: selectedState,
+      district,
+    });
+    setLoading(false);
+
+    if (res.success && res.emailVerificationPending) {
+      setPendingVerificationEmail(cleanEmail);
+      setViewStep('verification_pending');
+      setSuccessMsg(`Verification email sent to ${cleanEmail}. Please verify before continuing.`);
+    } else if (res.error) {
+      setErrorMsg(res.error);
+    }
+  };
+
+  // Handle Continue with Google
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setGoogleLoading(true);
+
+    const res = await loginWithGoogle();
+    setGoogleLoading(false);
+
+    if (res.success) {
+      if (res.profileComplete) {
+        closeAuthModal();
+        setActiveTab('home');
+      } else {
+        // Need to collect missing LifeLink information
+        setViewStep('google_complete_profile');
+      }
+    } else if (res.error) {
+      setErrorMsg(res.error);
+    }
+  };
+
+  // Handle Completing Missing Profile Details for Google User
+  const handleCompleteGoogleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    const cleanDigits = phoneDigits.replace(/\D/g, '');
+    if (cleanDigits.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number (+91).');
+      return;
+    }
+    if (!selectedState) {
+      setErrorMsg('Please select your State / Union Territory.');
+      return;
+    }
+    if (!district) {
+      setErrorMsg('Please select your District.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await completeGoogleProfile({
+      phone: `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`,
+      bloodGroup,
+      state: selectedState,
+      district,
+    });
+    setLoading(false);
+
+    if (res.success) {
+      closeAuthModal();
+      setActiveTab('home');
+    } else if (res.error) {
+      setErrorMsg(res.error);
+    }
+  };
+
+  // Handle Resend Verification Email
+  const handleResendVerification = async () => {
+    if (resendCooldown > 0) return;
+    setErrorMsg('');
+    setLoading(true);
+    const res = await resendVerificationEmail();
+    setLoading(false);
+    if (res.success) {
+      setSuccessMsg('A new verification email has been sent! Please check your inbox and spam folder.');
+      setResendCooldown(60);
+    } else if (res.error) {
+      setErrorMsg(res.error);
+    }
+  };
+
+  // Handle "I Have Verified My Email"
+  const handleCheckVerification = async () => {
+    setCheckingVerification(true);
+    setErrorMsg('');
+    const verified = await checkEmailVerified();
+    setCheckingVerification(false);
+
+    if (verified) {
+      closeAuthModal();
+      setActiveTab('home');
     } else {
-      loginWithEmail('emergency.delhi@apollo.hospital.in');
+      setErrorMsg('Email is not yet verified. Please click the verification link sent to your email, then click this button again.');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8">
-        {/* Header decoration */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6 transition-all">
+        
+        {/* Modal Header */}
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 p-6 text-white relative">
           <button
             onClick={closeAuthModal}
@@ -173,119 +298,212 @@ export const AuthModal: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20 shrink-0">
               <Heart className="w-6 h-6 fill-white text-white" />
             </div>
             <div>
               <h2 className="text-xl font-extrabold font-['Outfit',sans-serif]">
-                {isSignup ? 'Create LifeLink Account' : 'Welcome to LifeLink'}
+                {viewStep === 'verification_pending'
+                  ? 'Verify Your Email'
+                  : viewStep === 'google_complete_profile'
+                  ? 'Complete Your Profile'
+                  : isSignup
+                  ? 'Join LifeLink Network'
+                  : 'Welcome to LifeLink'}
               </h2>
               <p className="text-xs text-rose-100 mt-0.5">
-                {isSignup
-                  ? 'Join India’s verified blood donor & emergency response network'
-                  : 'Sign in with Mobile (+91) or Email'}
+                {viewStep === 'verification_pending'
+                  ? 'Please verify your email before continuing'
+                  : viewStep === 'google_complete_profile'
+                  ? 'Save your location & blood group to enable donor matching'
+                  : isSignup
+                  ? 'Sign up to donate blood or request emergency transfusions'
+                  : 'Sign in to access your donor dashboard'}
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex bg-black/20 p-1 rounded-xl mt-5 border border-white/10">
-            <button
-              onClick={() => {
-                openAuthModal('login');
-                setErrorMsg('');
-                setOtpSent(false);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                !isSignup ? 'bg-white text-red-700 shadow-sm' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => {
-                openAuthModal('signup');
-                setErrorMsg('');
-                setOtpSent(false);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                isSignup ? 'bg-white text-red-700 shadow-sm' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              New Registration
-            </button>
-          </div>
+          {/* Mode Switcher Tabs (Only in standard auth mode) */}
+          {viewStep === 'auth' && (
+            <div className="flex bg-black/20 p-1 rounded-xl mt-5 border border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('login');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  !isSignup ? 'bg-white text-red-700 shadow-xs' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('signup');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  isSignup ? 'bg-white text-red-700 shadow-xs' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-5">
-          {/* Method Switcher: Mobile or Email */}
-          <div className="flex items-center justify-center gap-2 p-1 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => {
-                setMethod('mobile');
-                setErrorMsg('');
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                method === 'mobile'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Phone className="w-3.5 h-3.5 text-red-600" />
-              <span>Mobile Number (+91)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMethod('email');
-                setErrorMsg('');
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                method === 'email'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Mail className="w-3.5 h-3.5 text-red-600" />
-              <span>Email Address</span>
-            </button>
-          </div>
-
-          {/* Error Message if any */}
+        {/* Modal Body */}
+        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          {/* Error Notice */}
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+              <div className="space-y-1">
+                <span>{errorMsg}</span>
+                {errorMsg.includes('already exists') && isSignup && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openAuthModal('login');
+                        setErrorMsg('');
+                      }}
+                      className="text-red-700 font-bold underline hover:text-red-800 cursor-pointer text-[11px]"
+                    >
+                      Click here to Sign In instead
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* MOBILE FORM */}
-          {method === 'mobile' ? (
-            <form onSubmit={handleMobileSubmit} className="space-y-4">
-              {isSignup && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Rahul Verma"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
-                    />
-                  </div>
-                </div>
-              )}
+          {/* Success Notice */}
+          {successMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+          )}
 
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* STEP 1: EMAIL VERIFICATION PENDING SCREEN                     */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {viewStep === 'verification_pending' && (
+            <div className="text-center py-3 space-y-4">
+              <div className="w-16 h-16 bg-amber-50 border-2 border-amber-200 text-amber-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                <Mail className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Please verify your email before continuing.
+                </h3>
+                <p className="text-xs text-slate-600 max-w-xs mx-auto">
+                  A verification link has been sent to{' '}
+                  <span className="font-bold text-slate-900">
+                    {pendingVerificationEmail || auth.currentUser?.email || 'your email'}
+                  </span>
+                  . Please check your inbox and click the link to activate your LifeLink account.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
+                  <span>Why verify?</span>
+                </div>
+                <p>
+                  To protect our voluntary donor directory and patient requests against spam, access to donor and request features requires a verified email address.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCheckVerification}
+                  disabled={checkingVerification}
+                  className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {checkingVerification ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Checking Status...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>I Have Verified My Email</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={loading || resendCooldown > 0}
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span>
+                    {resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : 'Resend Verification Email'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewStep('auth');
+                    openAuthModal('login');
+                    setErrorMsg('');
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-900 font-semibold pt-2 inline-block cursor-pointer"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* STEP 2: COMPLETE GOOGLE PROFILE (NEW GOOGLE USER)            */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {viewStep === 'google_complete_profile' && (
+            <form onSubmit={handleCompleteGoogleProfileSubmit} className="space-y-4">
+              <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl flex items-center gap-3">
+                {auth.currentUser?.photoURL ? (
+                  <img
+                    src={auth.currentUser.photoURL}
+                    alt={auth.currentUser.displayName || 'Google Avatar'}
+                    className="w-10 h-10 rounded-full border border-rose-200 object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-rose-200 flex items-center justify-center font-bold text-rose-800">
+                    {auth.currentUser?.displayName?.charAt(0) || 'G'}
+                  </div>
+                )}
+                <div className="overflow-hidden">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {auth.currentUser?.displayName || 'LifeLink Donor'}
+                  </p>
+                  <p className="text-[11px] text-slate-600 truncate">{auth.currentUser?.email}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600">
+                Please complete your donor location details. No password is required for Google users.
+              </p>
+
+              {/* Phone Number */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Indian Mobile Number <span className="text-red-500">*</span>
+                  Phone Number <span className="text-red-500">*</span>
                 </label>
                 <div className="relative flex items-center">
                   <div className="absolute left-3 flex items-center gap-1 text-xs font-bold text-slate-600 border-r border-slate-300 pr-2">
@@ -294,303 +512,305 @@ export const AuthModal: React.FC = () => {
                   <input
                     type="tel"
                     required
-                    maxLength={13}
-                    value={mobileNumber}
-                    onChange={(e) => setMobileNumber(e.target.value)}
+                    maxLength={10}
+                    value={phoneDigits}
+                    onChange={(e) => setPhoneDigits(e.target.value.replace(/\D/g, ''))}
                     placeholder="98765 43210"
                     className="w-full pl-20 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Used exclusively for critical emergency hospital SMS alerts.
-                </p>
               </div>
 
-              {otpSent && (
-                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 text-red-600" />
-                      Enter 4-Digit OTP Code:
-                    </label>
+              {/* Blood Group */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Blood Group <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {BLOOD_GROUPS.map((bg) => (
                     <button
+                      key={bg}
                       type="button"
-                      onClick={() => setOtpCode(simulatedOtp)}
-                      className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                      onClick={() => setBloodGroup(bg)}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        bloodGroup === bg
+                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
                     >
-                      Auto-fill ({simulatedOtp})
+                      {bg}
                     </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    placeholder="• • • •"
-                    className="w-full text-center tracking-widest text-lg font-bold font-mono py-2 bg-white border border-rose-300 rounded-xl text-slate-900 focus:border-red-500 outline-hidden"
-                  />
-
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Didn't receive SMS?</span>
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      className="text-red-600 font-bold hover:underline cursor-pointer"
-                    >
-                      Resend OTP
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              )}
+              </div>
 
-              {/* Additional Registration details */}
-              {isSignup && (
-                <div className="space-y-3 pt-1 border-t border-slate-100">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Blood Group
-                      </label>
-                      <select
-                        value={bloodGroup}
-                        onChange={(e) => setBloodGroup(e.target.value as BloodGroup)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:border-red-500 outline-hidden"
-                      >
-                        {BLOOD_GROUPS.map((bg) => (
-                          <option key={bg} value={bg}>
-                            {bg}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        City
-                      </label>
-                      <select
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:border-red-500 outline-hidden"
-                      >
-                        {INDIAN_CITIES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={asDonor}
-                      onChange={(e) => setAsDonor(e.target.checked)}
-                      className="mt-0.5 rounded text-red-600 focus:ring-red-500 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="text-left">
-                      <span className="text-xs font-bold text-slate-900 block">
-                        Enroll as Voluntary Donor
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        Allow verified hospitals in {city} to request emergency blood when matched.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              )}
+              {/* State & District Dependent Dropdowns */}
+              <LocationSelector
+                selectedState={selectedState}
+                selectedDistrict={district}
+                onStateChange={(st) => {
+                  setSelectedState(st);
+                  setDistrict('');
+                }}
+                onDistrictChange={(dt) => setDistrict(dt)}
+                stateRequired
+                districtRequired
+                isCompact
+              />
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
               >
                 {loading ? (
-                  <span>Verifying...</span>
-                ) : !otpSent ? (
                   <>
-                    <span>Get Verification Code</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </>
-                ) : isSignup ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Complete Registration</span>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Saving Profile...</span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Verify & Sign In</span>
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            /* EMAIL FORM */
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              {isSignup && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Ananya Sen"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 outline-hidden font-medium"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="email"
-                    required
-                    value={emailAddress}
-                    onChange={(e) => setEmailAddress(e.target.value)}
-                    placeholder="name@gmail.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 outline-hidden font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Password {isSignup && <span className="text-slate-400">(Optional for demo)</span>}
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 outline-hidden font-medium"
-                  />
-                </div>
-              </div>
-
-              {isSignup && (
-                <div className="space-y-3 pt-1 border-t border-slate-100">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Blood Group
-                      </label>
-                      <select
-                        value={bloodGroup}
-                        onChange={(e) => setBloodGroup(e.target.value as BloodGroup)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:border-red-500 outline-hidden"
-                      >
-                        {BLOOD_GROUPS.map((bg) => (
-                          <option key={bg} value={bg}>
-                            {bg}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        City
-                      </label>
-                      <select
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:border-red-500 outline-hidden"
-                      >
-                        {INDIAN_CITIES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={asDonor}
-                      onChange={(e) => setAsDonor(e.target.checked)}
-                      className="mt-0.5 rounded text-red-600 focus:ring-red-500 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="text-left">
-                      <span className="text-xs font-bold text-slate-900 block">
-                        Enroll as Voluntary Donor
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        Receive instant notifications when hospital patients near you need blood.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {loading ? (
-                  <span>Signing In...</span>
-                ) : isSignup ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Complete Registration</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Sign In with Email</span>
+                    <span>Complete Profile & Continue</span>
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
             </form>
           )}
 
-          {/* Quick Demo Accounts */}
-          <div className="pt-3 border-t border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Or Instant Demo Sign-In
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* STEP 3: REGULAR LOGIN & SIGNUP VIEWS                          */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {viewStep === 'auth' && (
+            <div className="space-y-4">
+              {/* Form (Login vs Signup) */}
+              <form
+                onSubmit={isSignup ? handleEmailSignup : handleEmailLogin}
+                className="space-y-3.5"
+              >
+                {/* Full Name (Signup only) */}
+                {isSignup && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g. Rahul Verma"
+                        className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Email Address */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your.name@example.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    {isSignup && (
+                      <span className="text-[10px] text-slate-400">Min 6 characters</span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Additional LifeLink Registration fields (Signup only) */}
+                {isSignup && (
+                  <>
+                    {/* Phone Number */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <div className="absolute left-3 flex items-center gap-1 text-xs font-bold text-slate-600 border-r border-slate-300 pr-2">
+                          <span>🇮🇳 +91</span>
+                        </div>
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          value={phoneDigits}
+                          onChange={(e) => setPhoneDigits(e.target.value.replace(/\D/g, ''))}
+                          placeholder="98765 43210"
+                          className="w-full pl-20 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Blood Group */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Blood Group <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {BLOOD_GROUPS.map((bg) => (
+                          <button
+                            key={bg}
+                            type="button"
+                            onClick={() => setBloodGroup(bg)}
+                            className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                              bloodGroup === bg
+                                ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            {bg}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* State & District Dependent Dropdowns */}
+                    <LocationSelector
+                      selectedState={selectedState}
+                      selectedDistrict={district}
+                      onStateChange={(st) => {
+                        setSelectedState(st);
+                        setDistrict('');
+                      }}
+                      onDistrictChange={(dt) => setDistrict(dt)}
+                      stateRequired
+                      districtRequired
+                      isCompact
+                    />
+                  </>
+                )}
+
+                {/* Primary Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading || googleLoading}
+                  className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isSignup ? 'Creating Account...' : 'Signing In...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{isSignup ? 'Sign Up' : 'Sign In'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* ──────── OR ──────── */}
+              <div className="relative flex items-center justify-center my-2">
+                <div className="border-t border-slate-200 w-full" />
+                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  OR
+                </span>
+                <div className="border-t border-slate-200 w-full" />
+              </div>
+
+              {/* Continue with Google Button */}
               <button
                 type="button"
-                onClick={() => handleQuickDemoLogin('donor')}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-red-300 text-left transition-all cursor-pointer"
+                onClick={handleGoogleSignIn}
+                disabled={loading || googleLoading}
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-xs border border-slate-300 shadow-xs hover:border-slate-400 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
               >
-                <div className="flex items-center gap-1.5">
-                  <Droplet className="w-3 h-3 text-red-600 fill-red-600" />
-                  <span className="text-xs font-bold text-slate-800 truncate">Aarav (Donor)</span>
-                </div>
-                <p className="text-[10px] text-slate-400">O+ • Mumbai</p>
+                {googleLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
+                    <span>Connecting to Google...</span>
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon className="w-4 h-4" />
+                    <span>Continue with Google</span>
+                  </>
+                )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('requester')}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-red-300 text-left transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3 h-3 text-slate-700" />
-                  <span className="text-xs font-bold text-slate-800 truncate">Hospital Admin</span>
-                </div>
-                <p className="text-[10px] text-slate-400">Apollo Hospital</p>
-              </button>
+              {/* Switch link */}
+              <div className="text-center pt-2">
+                {isSignup ? (
+                  <p className="text-xs text-slate-600">
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openAuthModal('login');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className="text-red-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-600">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openAuthModal('signup');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className="text-red-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Sign Up
+                    </button>
+                  </p>
+                )}
+              </div>
             </div>
+          )}
+
+          {/* Security & Confidentiality Tag */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] text-slate-400 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Secured with Firebase Authentication & Cloud Firestore</span>
           </div>
         </div>
       </div>

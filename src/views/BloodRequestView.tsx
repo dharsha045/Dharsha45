@@ -21,9 +21,10 @@ import {
 } from 'lucide-react';
 import { HOSPITAL_LIST } from '../data/mockData';
 import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 export const BloodRequestView: React.FC = () => {
-  const { createBloodRequest, setActiveTab, showToast, donors } = useApp();
+  const { createBloodRequest, setActiveTab, showToast, donors, authUser, isEmailVerified, openAuthModal } = useApp();
 
   const [patientName, setPatientName] = useState('');
   const [requiredBloodGroup, setRequiredBloodGroup] = useState<BloodGroup>('O-');
@@ -109,6 +110,18 @@ export const BloodRequestView: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!authUser) {
+      showToast('warning', 'Sign In Required', 'Please sign in or register to dispatch an emergency blood request.');
+      openAuthModal('login');
+      return;
+    }
+
+    if (!isEmailVerified && authUser.loginProvider !== 'google') {
+      showToast('warning', 'Email Verification Required', 'Please verify your email before continuing.');
+      return;
+    }
+
     if (!validate()) {
       showToast('error', 'Validation Error', 'Please check the Indian contact number and required location fields.');
       return;
@@ -165,6 +178,9 @@ export const BloodRequestView: React.FC = () => {
             Broadcast emergency requests instantly to matching volunteer donors across Indian cities with direct +91 calling and WhatsApp alert dispatch.
           </p>
         </div>
+
+        {/* Email Verification Banner */}
+        <EmailVerificationBanner />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Main Form */}
