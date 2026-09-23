@@ -77,7 +77,9 @@ export const RespondModal: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-rose-100">
               <Hospital className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{activeRespondRequest.hospitalName}, {activeRespondRequest.city} {activeRespondRequest.state ? `(${activeRespondRequest.state})` : ''}</span>
+              <span className="truncate">
+                {activeRespondRequest.hospitalName}, {activeRespondRequest.district ? `${activeRespondRequest.district}, ` : ''}{activeRespondRequest.state || activeRespondRequest.city}
+              </span>
             </div>
           </div>
         </div>

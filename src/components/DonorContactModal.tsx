@@ -45,7 +45,7 @@ export const DonorContactModal: React.FC = () => {
               </div>
               <p className="text-xs text-rose-100 flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3" />
-                {selectedDonorContact.location}, {selectedDonorContact.city} {selectedDonorContact.state ? `(${selectedDonorContact.state})` : ''}
+                {selectedDonorContact.location ? `${selectedDonorContact.location}, ` : ''}{selectedDonorContact.district ? `${selectedDonorContact.district}, ` : ''}{selectedDonorContact.state || selectedDonorContact.city}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-md bg-white text-red-700 font-extrabold text-xs shadow-xs">

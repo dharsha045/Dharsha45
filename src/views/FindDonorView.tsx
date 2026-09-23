@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { BloodGroup, Donor } from '../types';
 import {
@@ -19,37 +19,67 @@ import {
   Zap,
   SlidersHorizontal,
   Navigation,
-  Building2
+  Building2,
+  ChevronDown
 } from 'lucide-react';
-import { MAJOR_CITIES, INDIAN_STATES_AND_CITIES } from '../data/mockData';
+import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
 import { COMPATIBLE_DONORS_MAP } from '../utils/compatibility';
 
 export const FindDonorView: React.FC = () => {
-  const { donors, setSelectedDonorContact, setActiveTab } = useApp();
+  const {
+    donors,
+    setSelectedDonorContact,
+    setActiveTab,
+    searchStateFilter,
+    setSearchStateFilter,
+    searchDistrictFilter,
+    setSearchDistrictFilter,
+    searchBloodGroupFilter,
+    setSearchBloodGroupFilter
+  } = useApp();
 
-  const indianStates = Object.keys(INDIAN_STATES_AND_CITIES);
-
-  const [selectedBlood, setSelectedBlood] = useState<BloodGroup | 'All'>('All');
-  const [selectedState, setSelectedState] = useState<string>('All States');
-  const [selectedCity, setSelectedCity] = useState<string>('All Cities');
+  const [selectedBlood, setSelectedBlood] = useState<BloodGroup | 'All'>(searchBloodGroupFilter || 'All');
+  const [selectedState, setSelectedState] = useState<string>(searchStateFilter || 'All States');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(searchDistrictFilter || 'All Districts');
   const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available_only'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [includeCompatible, setIncludeCompatible] = useState<boolean>(false);
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
 
-  // Filter cities by state if state selected
-  const availableCitiesList = useMemo(() => {
-    if (selectedState === 'All States') {
-      return MAJOR_CITIES;
+  // Sync state if context filters change externally (e.g. from Home quick search)
+  useEffect(() => {
+    if (searchBloodGroupFilter) {
+      setSelectedBlood(searchBloodGroupFilter);
     }
-    const stateCities = INDIAN_STATES_AND_CITIES[selectedState] || [];
-    return ['All Cities', ...stateCities];
+    if (searchStateFilter) {
+      setSelectedState(searchStateFilter);
+    }
+    if (searchDistrictFilter) {
+      setSelectedDistrict(searchDistrictFilter);
+    }
+  }, [searchBloodGroupFilter, searchStateFilter, searchDistrictFilter]);
+
+  // Filter districts by selected state
+  const availableDistricts = useMemo(() => {
+    if (!selectedState || selectedState === 'All States') {
+      return [];
+    }
+    return getDistrictsForState(selectedState);
   }, [selectedState]);
+
+  const isDistrictDisabled = !selectedState || selectedState === 'All States';
 
   const handleStateChange = (st: string) => {
     setSelectedState(st);
-    setSelectedCity('All Cities');
+    setSelectedDistrict('All Districts');
+    setSearchStateFilter(st === 'All States' ? '' : st);
+    setSearchDistrictFilter('');
+  };
+
+  const handleDistrictChange = (dist: string) => {
+    setSelectedDistrict(dist);
+    setSearchDistrictFilter(dist === 'All Districts' ? '' : dist);
   };
 
   // Filter logic
@@ -66,15 +96,20 @@ export const FindDonorView: React.FC = () => {
       }
 
       // State matching
-      if (selectedState !== 'All States') {
+      if (selectedState && selectedState !== 'All States') {
         if (donor.state && donor.state.toLowerCase() !== selectedState.toLowerCase()) {
           return false;
         }
       }
 
-      // City matching
-      if (selectedCity !== 'All Cities' && donor.city.toLowerCase() !== selectedCity.toLowerCase()) {
-        return false;
+      // District matching (checks donor.district or donor.city)
+      if (selectedDistrict && selectedDistrict !== 'All Districts') {
+        const queryDist = selectedDistrict.toLowerCase();
+        const matchesDist = donor.district && donor.district.toLowerCase() === queryDist;
+        const matchesCity = donor.city && donor.city.toLowerCase() === queryDist;
+        if (!matchesDist && !matchesCity) {
+          return false;
+        }
       }
 
       // Availability matching
@@ -82,21 +117,24 @@ export const FindDonorView: React.FC = () => {
         return false;
       }
 
-      // Text search matching (name, location, city, pinCode, state, blood)
+      // Text search matching (name, location, city, district, pinCode, state, blood)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesName = donor.name.toLowerCase().includes(query);
         const matchesLocation = donor.location.toLowerCase().includes(query);
         const matchesCity = donor.city.toLowerCase().includes(query);
+        const matchesDist = donor.district?.toLowerCase().includes(query) || false;
         const matchesState = donor.state?.toLowerCase().includes(query) || false;
         const matchesPin = donor.pinCode?.toLowerCase().includes(query) || false;
         const matchesBlood = donor.bloodGroup.toLowerCase().includes(query);
-        if (!matchesName && !matchesLocation && !matchesCity && !matchesState && !matchesPin && !matchesBlood) return false;
+        if (!matchesName && !matchesLocation && !matchesCity && !matchesDist && !matchesState && !matchesPin && !matchesBlood) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [donors, selectedBlood, selectedState, selectedCity, availabilityFilter, searchQuery, includeCompatible]);
+  }, [donors, selectedBlood, selectedState, selectedDistrict, availabilityFilter, searchQuery, includeCompatible]);
 
   const availableCount = filteredDonors.filter((d) => d.isAvailable).length;
 
@@ -213,40 +251,50 @@ export const FindDonorView: React.FC = () => {
                 State / UT
               </label>
               <div className="relative">
-                <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <select
                   value={selectedState}
                   onChange={(e) => handleStateChange(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
+                  className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white appearance-none truncate cursor-pointer"
                 >
-                  <option value="All States">All States (Pan-India)</option>
-                  {indianStates.map((st) => (
+                  <option value="All States">All States / UTs</option>
+                  {INDIAN_STATES_AND_UTS.map((st) => (
                     <option key={st} value={st}>
                       {st}
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
               </div>
             </div>
 
-            {/* City Dropdown */}
+            {/* Dependent District Dropdown */}
             <div className="sm:col-span-3">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                City
+                District
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
+                  value={selectedDistrict}
+                  onChange={(e) => handleDistrictChange(e.target.value)}
+                  disabled={isDistrictDisabled}
+                  className={`w-full pl-9 pr-8 py-2 rounded-xl border text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white appearance-none truncate ${
+                    isDistrictDisabled
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-slate-50/50 text-slate-800 border-slate-200 cursor-pointer'
+                  }`}
                 >
-                  {availableCitiesList.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
+                  <option value="All Districts">
+                    {isDistrictDisabled ? 'Select State first' : 'All Districts'}
+                  </option>
+                  {availableDistricts.map((dist) => (
+                    <option key={dist} value={dist}>
+                      {dist}
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
               </div>
             </div>
 
@@ -325,7 +373,10 @@ export const FindDonorView: React.FC = () => {
               onClick={() => {
                 setSelectedBlood('All');
                 setSelectedState('All States');
-                setSelectedCity('All Cities');
+                setSelectedDistrict('All Districts');
+                setSearchBloodGroupFilter('All');
+                setSearchStateFilter('');
+                setSearchDistrictFilter('');
                 setAvailabilityFilter('all');
                 setSearchQuery('');
               }}
@@ -369,7 +420,7 @@ export const FindDonorView: React.FC = () => {
                           <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                             <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate max-w-[170px]">
-                              {donor.location}, {donor.city} {donor.state ? `(${donor.state})` : ''}
+                              {donor.location ? `${donor.location}, ` : ''}{donor.district ? `${donor.district}, ` : ''}{donor.state || donor.city}
                             </span>
                           </p>
                           <p className="text-[11px] text-slate-400 mt-0.5">

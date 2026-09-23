@@ -107,6 +107,14 @@ interface AppContextType {
   resetToEmpty: () => void;
   loadSampleData: () => void;
   totalLivesSaved: number;
+
+  // Global Search Filter Sync
+  searchStateFilter: string;
+  setSearchStateFilter: (val: string) => void;
+  searchDistrictFilter: string;
+  setSearchDistrictFilter: (val: string) => void;
+  searchBloodGroupFilter: BloodGroup | 'All';
+  setSearchBloodGroupFilter: (val: BloodGroup | 'All') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -209,6 +217,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeRespondRequest, setActiveRespondRequest] = useState<BloodRequest | null>(null);
   const [activeCertificate, setActiveCertificate] = useState<DonationRecord | null>(null);
   const [selectedDonorContact, setSelectedDonorContact] = useState<Donor | null>(null);
+
+  // Global Search Filters
+  const [searchStateFilter, setSearchStateFilter] = useState<string>('');
+  const [searchDistrictFilter, setSearchDistrictFilter] = useState<string>('');
+  const [searchBloodGroupFilter, setSearchBloodGroupFilter] = useState<BloodGroup | 'All'>('All');
 
   // Persistence effects
   useEffect(() => {
@@ -870,6 +883,12 @@ Medical Emergency: 108 / 112`;
         totalLivesSaved,
         isSoundEnabled,
         toggleSound,
+        searchStateFilter,
+        setSearchStateFilter,
+        searchDistrictFilter,
+        setSearchDistrictFilter,
+        searchBloodGroupFilter,
+        setSearchBloodGroupFilter,
       }}
     >
       {children}

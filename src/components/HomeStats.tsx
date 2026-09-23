@@ -49,35 +49,33 @@ export const HomeStats: React.FC = () => {
   ];
 
   return (
-    <section className="py-14 bg-white border-b border-slate-200/70">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, idx) => {
-            const Icon = stat.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-slate-50/70 rounded-3xl p-6 border border-slate-200/80 hover:border-red-200 transition-all hover:shadow-md group"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-2xl ${stat.bgColor} ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <Activity className="w-4 h-4 text-slate-300 group-hover:text-red-400 transition-colors" />
+    <div className="w-full">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+        {stats.map((stat, idx) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={idx}
+              className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/80 hover:border-red-200 transition-all hover:shadow-md group shadow-xs"
+            >
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl ${stat.bgColor} ${stat.color} flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                  <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tight font-['Outfit',sans-serif]">
-                    {stat.value}
-                  </h3>
-                  <p className="text-sm font-bold text-slate-700">{stat.label}</p>
-                  <p className="text-xs text-slate-500">{stat.subtext}</p>
-                </div>
+                <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300 group-hover:text-red-500 transition-colors" />
               </div>
-            );
-          })}
-        </div>
+
+              <div className="space-y-0.5 sm:space-y-1">
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-['Outfit',sans-serif] tabular-nums">
+                  {stat.value}
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-slate-800">{stat.label}</p>
+                <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">{stat.subtext}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </section>
+    </div>
   );
 };

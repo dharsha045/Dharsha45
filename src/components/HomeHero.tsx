@@ -2,30 +2,50 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BloodGroup } from '../types';
 import {
-  Heart,
   Search,
   UserPlus,
-  Droplet,
-  Siren,
-  ShieldCheck,
   ArrowRight,
   MapPin,
+  Building2,
+  ChevronDown,
   Sparkles,
-  Activity,
-  Smartphone,
-  Download,
-  LogIn,
-  Info
+  Users
 } from 'lucide-react';
-import { MAJOR_CITIES } from '../data/mockData';
+import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
 
 export const HomeHero: React.FC = () => {
-  const { setActiveTab, bloodRequests, donors, openApkModal, openAuthModal, authUser } = useApp();
+  const {
+    setActiveTab,
+    bloodRequests,
+    donors,
+    setSearchBloodGroupFilter,
+    setSearchStateFilter,
+    setSearchDistrictFilter,
+    searchStateFilter,
+    searchDistrictFilter,
+    searchBloodGroupFilter
+  } = useApp();
 
-  const [selectedBlood, setSelectedBlood] = useState<BloodGroup | 'All'>('All');
-  const [selectedCity, setSelectedCity] = useState<string>('All Cities');
+  const [selectedBlood, setSelectedBlood] = useState<BloodGroup | 'All'>(searchBloodGroupFilter || 'All');
+  const [selectedState, setSelectedState] = useState<string>(searchStateFilter || '');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(searchDistrictFilter || '');
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+
+  // Dynamically get districts belonging ONLY to the selected State/UT
+  const availableDistricts = selectedState ? getDistrictsForState(selectedState) : [];
+  const isDistrictDisabled = !selectedState;
+
+  const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newState = e.target.value;
+    setSelectedState(newState);
+    // Reset district selection whenever the state changes
+    setSelectedDistrict('');
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDistrict(e.target.value);
+  };
 
   const openUrgentCount = bloodRequests.filter(
     (r) => (r.emergencyLevel === 'Critical' || r.emergencyLevel === 'Urgent') && r.status === 'Open'
@@ -33,154 +53,182 @@ export const HomeHero: React.FC = () => {
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearchBloodGroupFilter(selectedBlood);
+    setSearchStateFilter(selectedState);
+    setSearchDistrictFilter(selectedDistrict);
     setActiveTab('find-donor');
   };
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/70 via-white to-slate-50 pt-10 pb-20 lg:pt-14 lg:pb-28 border-b border-slate-200/60">
-      {/* Background Decorative Rings */}
-      <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-red-100/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 w-96 h-96 bg-rose-100/40 rounded-full blur-3xl pointer-events-none" />
+    <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/50 via-white to-slate-50 pt-8 pb-16 lg:pt-12 lg:pb-24 border-b border-slate-200/80">
+      {/* Background Subtle Gradient Blobs */}
+      <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-red-100/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 w-96 h-96 bg-rose-100/30 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-3xl mx-auto space-y-6">
-          {/* Live Status Pill + APK Callout */}
-          <div className="flex flex-wrap items-center justify-center gap-2 animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-red-200 shadow-xs text-xs font-semibold text-red-700">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
-              </span>
-              <span className="font-bold">LifeLink Emergency Network Active</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-600">
-                {openUrgentCount === 0 ? '0 Open Requests • Ready for Emergencies' : `${openUrgentCount} Urgent Needs Today`}
-              </span>
-            </div>
-
-            <button
-              onClick={openApkModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-all hover:scale-105 cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Get Android APK (v2.4)</span>
-              <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-extrabold">
-                14.8 MB
-              </span>
-            </button>
-          </div>
-
-          {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] font-['Outfit',sans-serif]">
-            Donate Blood, <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-rose-600">Save Lives.</span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            A fast, secure, and intelligent platform connecting volunteer blood donors, emergency patients, trauma hospitals, and blood banks in real time across India.
-          </p>
-
-          {/* Core Action CTA Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button
-              onClick={() => setActiveTab('register-donor')}
-              className="px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm sm:text-base shadow-lg shadow-red-500/25 transition-all hover:scale-105 flex items-center gap-2 group cursor-pointer"
-            >
-              <UserPlus className="w-5 h-5" />
-              <span>Become a Donor</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button
-              onClick={() => setActiveTab('find-donor')}
-              className="px-6 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm sm:text-base border border-slate-300 shadow-xs transition-all hover:border-slate-400 flex items-center gap-2 cursor-pointer"
-            >
-              <Search className="w-5 h-5 text-red-600" />
-              <span>Find a Donor</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('request-blood')}
-              className="px-6 py-3.5 rounded-2xl bg-rose-100 hover:bg-rose-200 text-red-800 font-bold text-sm sm:text-base transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Droplet className="w-5 h-5 fill-red-600 text-red-600" />
-              <span>Request Blood</span>
-            </button>
-
-            {!authUser && (
-              <button
-                onClick={() => openAuthModal('login')}
-                className="px-5 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <LogIn className="w-4 h-4 text-rose-400" />
-                <span>Sign In (+91 / Email)</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Search Card Bar */}
-        <div className="mt-12 max-w-4xl mx-auto bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200/80 backdrop-blur-md">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-            <div className="flex items-center gap-2">
-              <Search className="w-5 h-5 text-red-600" />
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                Quick Emergency Donor Search
-              </h3>
-            </div>
-            <span className="text-xs text-slate-500 font-medium">
-              {donors.length === 0
-                ? '0 registered donors • Be the first to register'
-                : `${donors.length} verified registered donors`}
+          {/* Compact Emergency Blood Network Status Indicator */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/90 shadow-xs text-xs font-semibold text-slate-700">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+            </span>
+            <span className="font-bold text-slate-900">Emergency Blood Network Active</span>
+            <span className="text-slate-300" aria-hidden="true">·</span>
+            <span className="text-slate-600 truncate">
+              {openUrgentCount === 0
+                ? 'Zero unfulfilled shortages'
+                : `${openUrgentCount} urgent ${openUrgentCount === 1 ? 'need' : 'needs'} today`}
             </span>
           </div>
 
-          <form onSubmit={handleQuickSearch} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            {/* Blood Type Selector */}
-            <div className="sm:col-span-4">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+          {/* Main Hero Headline */}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] font-['Outfit',sans-serif] text-balance">
+            Donate Blood, <span className="text-red-600">Save Lives.</span>
+          </h1>
+
+          {/* Shorter, Professional Supporting Description */}
+          <p className="text-base sm:text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
+            A verified emergency network connecting voluntary donors with patients and trauma centers in real time across India.
+          </p>
+
+          {/* Only Two Primary Hero Actions: Become a Donor & Find a Donor */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1 w-full max-w-md mx-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('register-donor')}
+              className="w-full sm:w-auto min-w-[180px] px-6 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span>Become a Donor</span>
+              <ArrowRight className="w-4 h-4 ml-0.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('find-donor')}
+              className="w-full sm:w-auto min-w-[180px] px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm border border-slate-300 shadow-xs transition-all hover:border-slate-400 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Search className="w-4 h-4 text-red-600 shrink-0" />
+              <span>Find a Donor</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Redesigned Quick Emergency Donor Search Section */}
+        <div className="mt-12 sm:mt-14 max-w-4xl mx-auto bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-lg shadow-slate-200/50 border border-slate-200/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 mb-5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <Search className="w-4 h-4" />
+              </div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight font-['Outfit',sans-serif]">
+                Quick Emergency Donor Search
+              </h2>
+            </div>
+            {/* Dynamic Donor Count */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium self-start sm:self-auto">
+              <Users className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span>
+                <strong className="text-slate-900 font-bold tabular-nums">
+                  {donors.length.toLocaleString()}
+                </strong>{' '}
+                verified {donors.length === 1 ? 'donor' : 'donors'} registered
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleQuickSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4">
+            {/* Blood Group Dropdown */}
+            <div className="lg:col-span-3">
+              <label htmlFor="quick-blood-group" className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Required Blood Group
               </label>
-              <select
-                value={selectedBlood}
-                onChange={(e) => setSelectedBlood(e.target.value as any)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white"
-              >
-                <option value="All">All Blood Groups</option>
-                {bloodGroups.map((bg) => (
-                  <option key={bg} value={bg}>
-                    {bg} (Blood Group)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* City / Location */}
-            <div className="sm:col-span-5">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                City / Trauma Region
-              </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white"
+                  id="quick-blood-group"
+                  value={selectedBlood}
+                  onChange={(e) => setSelectedBlood(e.target.value as any)}
+                  className="w-full h-11 px-3.5 pr-8 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all cursor-pointer appearance-none"
                 >
-                  {MAJOR_CITIES.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
+                  <option value="All">All Blood Groups</option>
+                  {bloodGroups.map((bg) => (
+                    <option key={bg} value={bg}>
+                      {bg}
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 1. State / Union Territory Dropdown */}
+            <div className="lg:col-span-3">
+              <label htmlFor="quick-state" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                State / Union Territory
+              </label>
+              <div className="relative">
+                <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                <select
+                  id="quick-state"
+                  value={selectedState}
+                  onChange={handleStateChange}
+                  className="w-full h-11 pl-10 pr-8 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all cursor-pointer appearance-none truncate"
+                >
+                  <option value="">Select State / UT</option>
+                  {INDIAN_STATES_AND_UTS.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 2. District Dropdown (Dependent) */}
+            <div className="lg:col-span-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="quick-district" className="block text-xs font-semibold text-slate-700">
+                  District
+                </label>
+                {isDistrictDisabled && (
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    Select State first
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                <select
+                  id="quick-district"
+                  value={selectedDistrict}
+                  onChange={handleDistrictChange}
+                  disabled={isDistrictDisabled}
+                  className={`w-full h-11 pl-10 pr-8 rounded-xl border text-sm font-semibold transition-all appearance-none truncate ${
+                    isDistrictDisabled
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-white text-slate-800 border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer'
+                  }`}
+                >
+                  <option value="">
+                    {isDistrictDisabled ? 'Select State / UT first' : 'Select District'}
+                  </option>
+                  {availableDistricts.map((dist) => (
+                    <option key={dist} value={dist}>
+                      {dist}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
               </div>
             </div>
 
             {/* Search Button */}
-            <div className="sm:col-span-3 flex items-end">
+            <div className="lg:col-span-3 flex items-end">
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full h-11 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
               >
                 <Search className="w-4 h-4" />
                 <span>Search Donors</span>
@@ -188,44 +236,39 @@ export const HomeHero: React.FC = () => {
             </div>
           </form>
 
-          {/* Quick Blood Group Chips */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-slate-500 font-medium mr-1">Popular:</span>
-            {['O-', 'O+', 'A+', 'B+'].map((bg) => (
-              <button
-                key={bg}
-                type="button"
-                onClick={() => {
-                  setSelectedBlood(bg as BloodGroup);
-                  setActiveTab('find-donor');
-                }}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-700 font-bold transition-colors cursor-pointer"
-              >
-                {bg}
-              </button>
-            ))}
-            <div className="ml-auto flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveTab('about')}
-                className="text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1 text-[11px] cursor-pointer"
-              >
-                <Info className="w-3 h-3 text-slate-500" />
-                About LifeLink
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('compatibility-guide')}
-                className="text-red-600 hover:underline font-semibold flex items-center gap-1 text-[11px] cursor-pointer"
-              >
-                <Sparkles className="w-3 h-3" />
-                Compatibility Matrix
-              </button>
+          {/* Quick Access Blood Groups & Clinical Guides */}
+          <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-slate-500 font-medium">Quick search:</span>
+              {(['O-', 'O+', 'A+', 'B+'] as BloodGroup[]).map((bg) => (
+                <button
+                  key={bg}
+                  type="button"
+                  onClick={() => {
+                    setSelectedBlood(bg);
+                    setSearchBloodGroupFilter(bg);
+                    setActiveTab('find-donor');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  {bg}
+                </button>
+              ))}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('compatibility-guide')}
+              className="text-red-600 hover:text-red-700 font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Transfusion Compatibility Matrix</span>
+            </button>
           </div>
         </div>
       </div>
     </section>
   );
 };
+
 

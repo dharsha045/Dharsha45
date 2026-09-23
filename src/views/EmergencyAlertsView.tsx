@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { EmergencyLevel, BloodGroup, RequestStatus } from '../types';
 import {
@@ -18,9 +18,11 @@ import {
   Share2,
   Volume2,
   VolumeX,
-  Droplet
+  Droplet,
+  Building2,
+  ChevronDown
 } from 'lucide-react';
-import { MAJOR_CITIES } from '../data/mockData';
+import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
 
 export const EmergencyAlertsView: React.FC = () => {
   const {
@@ -35,15 +37,32 @@ export const EmergencyAlertsView: React.FC = () => {
 
   const [levelFilter, setLevelFilter] = useState<EmergencyLevel | 'All'>('All');
   const [bloodFilter, setBloodFilter] = useState<BloodGroup | 'All'>('All');
-  const [cityFilter, setCityFilter] = useState<string>('All Cities');
+  const [stateFilter, setStateFilter] = useState<string>('All States');
+  const [districtFilter, setDistrictFilter] = useState<string>('All Districts');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Open' | 'Fulfilled'>('Open');
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
 
+  const availableDistricts = useMemo(() => {
+    if (!stateFilter || stateFilter === 'All States') return [];
+    return getDistrictsForState(stateFilter);
+  }, [stateFilter]);
+
+  const handleStateChange = (st: string) => {
+    setStateFilter(st);
+    setDistrictFilter('All Districts');
+  };
+
   const filteredRequests = bloodRequests.filter((req) => {
     if (levelFilter !== 'All' && req.emergencyLevel !== levelFilter) return false;
     if (bloodFilter !== 'All' && req.requiredBloodGroup !== bloodFilter) return false;
-    if (cityFilter !== 'All Cities' && req.city.toLowerCase() !== cityFilter.toLowerCase()) return false;
+    if (stateFilter !== 'All States' && req.state && req.state.toLowerCase() !== stateFilter.toLowerCase()) return false;
+    if (districtFilter !== 'All Districts') {
+      const query = districtFilter.toLowerCase();
+      const matchesDist = req.district && req.district.toLowerCase() === query;
+      const matchesCity = req.city && req.city.toLowerCase() === query;
+      if (!matchesDist && !matchesCity) return false;
+    }
     if (statusFilter !== 'All' && req.status !== statusFilter) return false;
     return true;
   });
@@ -194,18 +213,47 @@ export const EmergencyAlertsView: React.FC = () => {
               ))}
             </div>
 
-            <div className="sm:col-span-4 flex items-center justify-end">
-              <select
-                value={cityFilter}
-                onChange={(e) => setCityFilter(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                {MAJOR_CITIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+            <div className="sm:col-span-5 grid grid-cols-2 gap-2">
+              <div className="relative">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                <select
+                  value={stateFilter}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  className="w-full pl-8 pr-6 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:outline-hidden focus:ring-2 focus:ring-red-500 appearance-none truncate cursor-pointer"
+                >
+                  <option value="All States">All States / UTs</option>
+                  {INDIAN_STATES_AND_UTS.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                <select
+                  value={districtFilter}
+                  onChange={(e) => setDistrictFilter(e.target.value)}
+                  disabled={!stateFilter || stateFilter === 'All States'}
+                  className={`w-full pl-8 pr-6 py-1.5 rounded-xl border text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-red-500 appearance-none truncate ${
+                    !stateFilter || stateFilter === 'All States'
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-slate-50 text-slate-800 border-slate-200 cursor-pointer'
+                  }`}
+                >
+                  <option value="All Districts">
+                    {!stateFilter || stateFilter === 'All States' ? 'Select State first' : 'All Districts'}
                   </option>
-                ))}
-              </select>
+                  {availableDistricts.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -252,7 +300,8 @@ export const EmergencyAlertsView: React.FC = () => {
               onClick={() => {
                 setLevelFilter('All');
                 setBloodFilter('All');
-                setCityFilter('All Cities');
+                setStateFilter('All States');
+                setDistrictFilter('All Districts');
                 setStatusFilter('Open');
               }}
               className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl cursor-pointer"
@@ -335,7 +384,9 @@ export const EmergencyAlertsView: React.FC = () => {
                       <span>{req.hospitalName}</span>
                       <span className="text-slate-300">•</span>
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{req.location || req.city}</span>
+                      <span>
+                        {req.location ? `${req.location}, ` : ''}{req.district ? `${req.district}, ` : ''}{req.state || req.city}
+                      </span>
                     </p>
 
                     {req.reason && (

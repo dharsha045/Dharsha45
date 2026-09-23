@@ -13,6 +13,7 @@ export interface Donor {
   phone: string;
   email: string;
   state?: string;
+  district?: string;
   city: string;
   pinCode?: string;
   location: string;
@@ -40,6 +41,7 @@ export interface BloodRequest {
   hospitalName: string;
   location: string;
   state?: string;
+  district?: string;
   city: string;
   pinCode?: string;
   contactNumber: string;
@@ -67,6 +69,7 @@ export interface DonationRecord {
   donationDate: string;
   hospitalName: string;
   state?: string;
+  district?: string;
   city: string;
   bloodGroup: BloodGroup;
   units: number;
@@ -108,6 +111,7 @@ export interface AuthUser {
   bloodGroup?: BloodGroup;
   role: 'donor' | 'requester' | 'admin';
   city?: string;
+  district?: string;
   state?: string;
   avatar?: string;
   createdAt: string;

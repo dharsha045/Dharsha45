@@ -102,54 +102,54 @@ export const HowItWorks: React.FC = () => {
         </div>
 
         {/* 4 Steps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {currentSteps.map((stepItem, idx) => {
             const Icon = stepItem.icon;
             return (
               <div
                 key={idx}
-                className="bg-slate-50/60 rounded-3xl p-6 border border-slate-200/80 hover:border-red-300 transition-all hover:shadow-lg flex flex-col justify-between group"
+                className="bg-slate-50/70 rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 hover:border-red-300 transition-all hover:shadow-md flex flex-col justify-between group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-2xl font-black font-mono text-red-600/60 group-hover:text-red-600 transition-colors">
+                  <div className="flex items-center justify-between mb-4 sm:mb-5">
+                    <span className="text-xl sm:text-2xl font-black font-mono text-red-600/60 group-hover:text-red-600 transition-colors">
                       {stepItem.step}
                     </span>
-                    <div className="w-12 h-12 rounded-2xl bg-red-100/80 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Icon className="w-6 h-6" />
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-red-100/80 text-red-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                     </div>
                   </div>
 
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">{stepItem.title}</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1.5">{stepItem.title}</h3>
                   <p className="text-xs text-slate-600 leading-relaxed">{stepItem.description}</p>
                 </div>
 
-                <div className="pt-6 mt-4 border-t border-slate-200/60 flex items-center text-xs font-bold text-red-600 group-hover:translate-x-1 transition-transform">
+                <div className="pt-4 sm:pt-5 mt-4 border-t border-slate-200/70 flex items-center text-xs font-semibold text-slate-500 group-hover:text-red-600 transition-colors">
                   <span>Step {idx + 1} of 4</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Bottom CTA */}
-        <div className="mt-12 text-center">
+        {/* Action Link */}
+        <div className="mt-10 sm:mt-12 text-center">
           {activeWorkflow === 'donor' ? (
             <button
               onClick={() => setActiveTab('register-donor')}
-              className="px-8 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition-all hover:scale-105 inline-flex items-center gap-2"
+              className="px-6 sm:px-8 py-3 rounded-xl sm:rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-red-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer"
             >
               <UserCheck className="w-4 h-4" />
-              <span>Register as a Volunteer Donor Now</span>
+              <span>Register as a Volunteer Donor</span>
             </button>
           ) : (
             <button
               onClick={() => setActiveTab('request-blood')}
-              className="px-8 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition-all hover:scale-105 inline-flex items-center gap-2"
+              className="px-6 sm:px-8 py-3 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer"
             >
-              <Hospital className="w-4 h-4" />
-              <span>Submit Blood Request</span>
+              <Hospital className="w-4 h-4 text-rose-400" />
+              <span>Create Verified Blood Request</span>
             </button>
           )}
         </div>

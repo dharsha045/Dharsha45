@@ -1,70 +1,74 @@
 import React from 'react';
 import { HomeHero } from '../components/HomeHero';
-import { HomeStats } from '../components/HomeStats';
-import { EmergencyAlertsSection } from '../components/EmergencyAlertsSection';
 import { HowItWorks } from '../components/HowItWorks';
+import { HomeStats } from '../components/HomeStats';
 import { BloodCompatibilityMatrix } from '../components/BloodCompatibilityMatrix';
 import { DonorEligibilityQuiz } from '../components/DonorEligibilityQuiz';
-import { useApp } from '../context/AppContext';
-import { Heart, UserPlus, Search, Droplet, Siren, ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Lock, Activity, HeartHandshake } from 'lucide-react';
 
 export const HomeView: React.FC = () => {
-  const { setActiveTab } = useApp();
-
   return (
     <div className="space-y-0 animate-fade-in">
-      {/* 1. Hero Section */}
+      {/* 1. Hero Section (Includes compact status indicator, hero headline, 2 primary actions, and quick donor search) */}
       <HomeHero />
 
-      {/* 2. Live Statistics */}
-      <HomeStats />
-
-      {/* 3. Emergency Blood Requests Section */}
-      <EmergencyAlertsSection />
-
-      {/* 4. How It Works Section */}
+      {/* 2. How LifeLink Works */}
       <HowItWorks />
 
-      {/* 5. Educational & Clinical Section (Compatibility & Eligibility) */}
-      <section className="py-20 bg-slate-50 border-b border-slate-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+      {/* 3. Trust / Safety & Clinical Standards Section */}
+      <section className="py-16 sm:py-20 bg-slate-50 border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14 sm:space-y-16">
+          {/* Trust & Safety Header & Badges */}
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-red-600">
+              Verified Clinical Standards
+            </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight font-['Outfit',sans-serif]">
+              Trust, Safety & Medical Integrity
+            </h2>
+            <p className="text-slate-600 text-xs sm:text-sm">
+              LifeLink operates under strict healthcare protocols aligned with the National Blood Transfusion Council (NBTC) and WHO guidelines.
+            </p>
+
+            {/* 4 Trust Pillars */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 pt-4 text-left">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 mb-2" />
+                <h4 className="text-xs font-bold text-slate-900">100% Voluntary</h4>
+                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Non-remunerated ethical blood donation only.</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <Lock className="w-5 h-5 text-blue-600 mb-2" />
+                <h4 className="text-xs font-bold text-slate-900">Data Privacy</h4>
+                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Secure contact masking and verified communications.</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <Activity className="w-5 h-5 text-red-600 mb-2" />
+                <h4 className="text-xs font-bold text-slate-900">Mandatory Screening</h4>
+                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Clinical infection and cross-match verification.</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <HeartHandshake className="w-5 h-5 text-amber-600 mb-2" />
+                <h4 className="text-xs font-bold text-slate-900">Hospital Linked</h4>
+                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Direct integration with trauma center blood banks.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Verified Network Statistics */}
+          <HomeStats />
+
+          {/* Clinical Transfusion Compatibility Matrix */}
           <BloodCompatibilityMatrix />
+
+          {/* Medical Donor Eligibility Assessment Quiz */}
           <DonorEligibilityQuiz />
-        </div>
-      </section>
-
-      {/* 6. Community Callout Banner */}
-      <section className="py-16 bg-gradient-to-r from-red-600 to-rose-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md text-white mx-auto flex items-center justify-center shadow-lg">
-            <Heart className="w-8 h-8 fill-white" />
-          </div>
-
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight font-['Outfit',sans-serif]">
-            Every 2 Seconds, Someone Needs Blood
-          </h2>
-
-          <p className="text-rose-100 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-            One single blood donation can save up to 3 lives. Join thousands of heroes in your city and stay prepared for local medical emergencies.
-          </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <button
-              onClick={() => setActiveTab('register-donor')}
-              className="px-8 py-3.5 rounded-2xl bg-white hover:bg-rose-50 text-red-700 font-extrabold text-sm sm:text-base shadow-xl transition-all hover:scale-105"
-            >
-              Join LifeLink Registry
-            </button>
-
-            <button
-              onClick={() => setActiveTab('request-blood')}
-              className="px-8 py-3.5 rounded-2xl bg-red-900/60 hover:bg-red-900 text-white font-bold text-sm sm:text-base border border-white/20 transition-all"
-            >
-              Post Urgent Request
-            </button>
-          </div>
         </div>
       </section>
     </div>
   );
 };
+

@@ -16,14 +16,14 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  Building2
+  Building2,
+  ChevronDown
 } from 'lucide-react';
-import { MAJOR_CITIES, HOSPITAL_LIST, INDIAN_STATES_AND_CITIES } from '../data/mockData';
+import { HOSPITAL_LIST } from '../data/mockData';
+import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
 
 export const BloodRequestView: React.FC = () => {
   const { createBloodRequest, setActiveTab, showToast, donors } = useApp();
-
-  const indianStates = Object.keys(INDIAN_STATES_AND_CITIES);
 
   const [patientName, setPatientName] = useState('');
   const [requiredBloodGroup, setRequiredBloodGroup] = useState<BloodGroup>('O-');
@@ -31,8 +31,8 @@ export const BloodRequestView: React.FC = () => {
   const [hospitalName, setHospitalName] = useState(HOSPITAL_LIST[0]);
   const [customHospital, setCustomHospital] = useState('');
   const [useCustomHospital, setUseCustomHospital] = useState(false);
-  const [selectedState, setSelectedState] = useState<string>('Tamil Nadu');
-  const [city, setCity] = useState<string>('Chennai');
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [district, setDistrict] = useState<string>('');
   const [location, setLocation] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [contactDigits, setContactDigits] = useState('');
@@ -46,13 +46,30 @@ export const BloodRequestView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const bloodGroups: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
-  const availableCities = INDIAN_STATES_AND_CITIES[selectedState] || [city];
+
+  const availableDistricts = selectedState ? getDistrictsForState(selectedState) : [];
+  const isDistrictDisabled = !selectedState;
 
   const handleStateChange = (newState: string) => {
     setSelectedState(newState);
-    const citiesInState = INDIAN_STATES_AND_CITIES[newState] || [];
-    if (citiesInState.length > 0) {
-      setCity(citiesInState[0]);
+    setDistrict('');
+    if (errors.state) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.state;
+        return copy;
+      });
+    }
+  };
+
+  const handleDistrictChange = (newDist: string) => {
+    setDistrict(newDist);
+    if (errors.district) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.district;
+        return copy;
+      });
     }
   };
 
@@ -65,6 +82,8 @@ export const BloodRequestView: React.FC = () => {
       errs.contactNumber = 'Enter a valid 10-digit Indian mobile number (+91)';
     }
 
+    if (!selectedState) errs.state = 'Please select a State / Union Territory';
+    if (!district) errs.district = 'Please select a District';
     if (!requesterName.trim()) errs.requesterName = 'Doctor, nurse, or family contact name is required';
     if (useCustomHospital && !customHospital.trim()) errs.customHospital = 'Hospital / Blood Bank name is required';
     if (!location.trim()) errs.location = 'Hospital department, ward, or room number is required';
@@ -76,14 +95,22 @@ export const BloodRequestView: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const potentialDonorsCount = donors.filter(
-    (d) => d.bloodGroup === requiredBloodGroup && d.city.toLowerCase() === city.toLowerCase()
-  ).length;
+  const potentialDonorsCount = donors.filter((d) => {
+    if (d.bloodGroup !== requiredBloodGroup) return false;
+    if (selectedState && d.state && d.state.toLowerCase() !== selectedState.toLowerCase()) return false;
+    if (district) {
+      const queryDist = district.toLowerCase();
+      const matchesDist = d.district && d.district.toLowerCase() === queryDist;
+      const matchesCity = d.city && d.city.toLowerCase() === queryDist;
+      if (!matchesDist && !matchesCity) return false;
+    }
+    return true;
+  }).length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      showToast('error', 'Validation Error', 'Please check the Indian contact number and required fields.');
+      showToast('error', 'Validation Error', 'Please check the Indian contact number and required location fields.');
       return;
     }
 
@@ -105,7 +132,8 @@ export const BloodRequestView: React.FC = () => {
         hospitalName: finalHospital,
         location,
         state: selectedState,
-        city,
+        district,
+        city: district,
         pinCode: pinCode.trim() || undefined,
         contactNumber: formattedMain,
         alternateContact: formattedAlt,
@@ -302,43 +330,66 @@ export const BloodRequestView: React.FC = () => {
               </div>
             </div>
 
-            {/* Indian State & City */}
+            {/* 1. State / Union Territory & 2. District (Dependent Dropdowns) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Indian State / UT *
+                  State / Union Territory *
                 </label>
                 <div className="relative">
-                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <select
                     value={selectedState}
                     onChange={(e) => handleStateChange(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white appearance-none truncate cursor-pointer"
                   >
-                    {indianStates.map((st) => (
+                    <option value="">Select State / UT</option>
+                    {INDIAN_STATES_AND_UTS.map((st) => (
                       <option key={st} value={st}>
                         {st}
                       </option>
                     ))}
                   </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
                 </div>
+                {errors.state && <p className="text-xs text-rose-600 mt-1">{errors.state}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  City *
-                </label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  {availableCities.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    District *
+                  </label>
+                  {isDistrictDisabled && (
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      Select State first
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                  <select
+                    value={district}
+                    onChange={(e) => handleDistrictChange(e.target.value)}
+                    disabled={isDistrictDisabled}
+                    className={`w-full pl-10 pr-9 py-2.5 rounded-xl border text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:bg-white appearance-none truncate ${
+                      isDistrictDisabled
+                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                        : 'bg-slate-50/50 text-slate-800 border-slate-200 cursor-pointer'
+                    }`}
+                  >
+                    <option value="">
+                      {isDistrictDisabled ? 'Select State / UT first' : 'Select District'}
                     </option>
-                  ))}
-                </select>
+                    {availableDistricts.map((dist) => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                </div>
+                {errors.district && <p className="text-xs text-rose-600 mt-1">{errors.district}</p>}
               </div>
             </div>
 
@@ -546,7 +597,7 @@ export const BloodRequestView: React.FC = () => {
                 <p className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
                   <Hospital className="w-3.5 h-3.5 text-red-600 shrink-0" />
                   <span className="truncate">
-                    {useCustomHospital ? (customHospital || 'Hospital Name') : hospitalName}, {city}
+                    {useCustomHospital ? (customHospital || 'Hospital Name') : hospitalName}{district ? `, ${district}` : ''}{selectedState ? `, ${selectedState}` : ''}
                   </span>
                 </p>
 
@@ -561,16 +612,18 @@ export const BloodRequestView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Matching Donors in Indian City */}
+              {/* Matching Donors in Indian Location */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-700">Matching {requiredBloodGroup} Donors in {city}:</span>
+                  <span className="font-bold text-slate-700">
+                    Matching {requiredBloodGroup} Donors in {district || selectedState || 'your region'}:
+                  </span>
                   <span className="font-extrabold text-red-600 bg-rose-100 px-2 py-0.5 rounded-full">
                     {potentialDonorsCount} Available
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Upon posting, automated emergency alerts and priority SMS will be routed immediately to registered voluntary lifesavers across {city}, {selectedState}.
+                  Upon posting, automated emergency alerts and priority SMS will be routed immediately to registered voluntary lifesavers across {district ? `${district}, ` : ''}{selectedState || 'India'}.
                 </p>
               </div>
             </div>
