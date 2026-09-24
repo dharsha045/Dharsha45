@@ -1,4 +1,4 @@
-const firebaseConfig = {
+{
   apiKey: "AIzaSyBtNsPl4_VQ0p675bVT-GPdchhovpMzTAE",
   authDomain: "lifelink-blood-donation45.firebaseapp.com",
   projectId: "lifelink-blood-donation45",
@@ -6,4 +6,4 @@ const firebaseConfig = {
   messagingSenderId: "22210227466",
   appId: "1:22210227466:web:933f3bb4687152a7989ef3",
   measurementId: "G-DE3EBY03P8"
-};
+}
