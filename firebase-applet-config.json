@@ -1,12 +1,9 @@
 {
-  "projectId": "original-flag-vnm8c",
-  "appId": "1:371470662405:web:6afe48560bfbb156dc956c",
-  "apiKey": "AIzaSyDn5AghLgDmE_cNshaUIk_T4lqfqmBhEOM",
-  "authDomain": "original-flag-vnm8c.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-lifelinksmartblo-770e1c6a-9341-4762-b132-1cf4239fc443",
-  "storageBucket": "original-flag-vnm8c.firebasestorage.app",
-  "messagingSenderId": "371470662405",
-  "measurementId": "",
-  "oAuthClientId": "371470662405-q1ctgkged71m4mbfqo7vk8ahpl44ma3l.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  apiKey: "AIzaSyBtNsPl4_VQ0p675bVT-GPdchhovpMzTAE",
+  authDomain: "lifelink-blood-donation45.firebaseapp.com",
+  projectId: "lifelink-blood-donation45",
+  storageBucket: "lifelink-blood-donation45.firebasestorage.app",
+  messagingSenderId: "22210227466",
+  appId: "1:22210227466:web:933f3bb4687152a7989ef3",
+  measurementId: "G-DE3EBY03P8"
 }
