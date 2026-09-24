@@ -25,7 +25,6 @@ import {
   updateFirestoreUser,
   queryFirestoreDonors,
   formatAuthError,
-  testFirestoreConnection,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -324,9 +323,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Firebase Auth State & Firestore Sync
   useEffect(() => {
-    // Check connection to Firestore database per guidelines
-    testFirestoreConnection();
-
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
