@@ -56,14 +56,19 @@ const firestoreDbId = resolvedConfig.firestoreDatabaseId && resolvedConfig.fires
   ? resolvedConfig.firestoreDatabaseId
   : undefined;
 
-export const db = initializeFirestore(
-  app,
-  {
-    experimentalForceLongPolling: true,
-    ignoreUndefinedProperties: true,
-  },
-  firestoreDbId
-);
+export const db = firestoreDbId
+  ? initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+        ignoreUndefinedProperties: true,
+      },
+      firestoreDbId
+    )
+  : initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      ignoreUndefinedProperties: true,
+    });
 
 // Firestore User Document Interface
 export interface FirestoreUserData {
