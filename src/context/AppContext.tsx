@@ -7,6 +7,7 @@ import {
   NavigationTab,
   BloodInventoryItem,
   BloodGroup,
+  RequestStatus,
   AuthUser
 } from '../types';
 import {
@@ -33,6 +34,11 @@ import {
   onAuthStateChanged,
   reload,
   googleProvider,
+  subscribeToFirestoreDonors,
+  subscribeToFirestoreRequests,
+  saveFirestoreBloodRequest,
+  updateFirestoreBloodRequest,
+  deleteFirestoreBloodRequest,
   FirebaseUser
 } from '../services/firebase';
 
@@ -407,6 +413,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => unsubscribe();
   }, []);
 
+  // Real-time synchronization for blood requests across all signed-in users
+  useEffect(() => {
+    const unsubRequests = subscribeToFirestoreRequests((firestoreReqs) => {
+      if (firestoreReqs && firestoreReqs.length > 0) {
+        setBloodRequests((prev) => {
+          // Merge remote requests with any local unsynced requests
+          const map = new Map<string, BloodRequest>();
+          firestoreReqs.forEach((r) => map.set(r.id, r));
+          prev.forEach((r) => {
+            if (!map.has(r.id)) {
+              map.set(r.id, r);
+            }
+          });
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
+      }
+    });
+
+    // Real-time synchronization for registered donors across all signed-in users
+    const unsubDonors = subscribeToFirestoreDonors((firestoreDonors) => {
+      if (firestoreDonors && firestoreDonors.length > 0) {
+        setDonors((prev) => {
+          const map = new Map<string, Donor>();
+          // Remote registered users take priority
+          prev.forEach((d) => map.set(d.id, d));
+          firestoreDonors.forEach((d) => map.set(d.id, d));
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    return () => {
+      unsubRequests();
+      unsubDonors();
+    };
+  }, []);
+
   // Current logged in donor resolution
   const currentDonor = useMemo(() => {
     if (!currentDonorId) return null;
@@ -562,6 +607,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setBloodRequests((prev) => [newReq, ...prev]);
+    // Broadcast to Cloud Firestore so ALL other users instantly see it
+    saveFirestoreBloodRequest(newReq);
 
     // Create immediate alert broadcast notification
     const alertNotif: AppNotification = {
@@ -586,21 +633,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const respondToRequest = (requestId: string, donorName: string, donorPhone: string, note?: string) => {
+    const targetReq = bloodRequests.find((r) => r.id === requestId);
+    const updatedStatus: RequestStatus = 'In Progress';
+    const updatedCount = (targetReq?.responsesCount || 0) + 1;
+    const updatedNotes = note ? `${targetReq?.notes ? targetReq.notes + ' | ' : ''}Donor Note: ${note}` : targetReq?.notes;
+
+    // Update in local state
     setBloodRequests((prev) =>
       prev.map((req) => {
         if (req.id === requestId) {
           return {
             ...req,
-            status: 'In Progress',
+            status: updatedStatus,
             responsesCount: req.responsesCount + 1,
             assignedDonorName: donorName,
             assignedDonorPhone: donorPhone,
-            notes: note ? `${req.notes ? req.notes + ' | ' : ''}Donor Note: ${note}` : req.notes,
+            notes: updatedNotes,
           };
         }
         return req;
       })
     );
+
+    // Sync response to Cloud Firestore so the requester & all users see the response in real-time
+    updateFirestoreBloodRequest(requestId, {
+      status: updatedStatus,
+      responsesCount: updatedCount,
+      assignedDonorName: donorName,
+      assignedDonorPhone: donorPhone,
+      notes: updatedNotes,
+    });
 
     const matchNotif: AppNotification = {
       id: `notif-${Date.now()}`,
@@ -623,17 +685,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const markRequestFulfilled = (requestId: string) => {
     const targetReq = bloodRequests.find((r) => r.id === requestId);
+    const fulfilledAt = new Date().toISOString();
     setBloodRequests((prev) =>
       prev.map((r) =>
         r.id === requestId
           ? {
               ...r,
               status: 'Fulfilled',
-              fulfilledAt: new Date().toISOString(),
+              fulfilledAt,
             }
           : r
       )
     );
+
+    // Sync fulfillment to Cloud Firestore
+    updateFirestoreBloodRequest(requestId, {
+      status: 'Fulfilled',
+      fulfilledAt,
+    });
 
     if (targetReq && currentDonor) {
       // Add donation record for current donor
@@ -653,14 +722,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const toggleRequestVerification = (requestId: string) => {
+    const targetReq = bloodRequests.find((r) => r.id === requestId);
+    const newVer = targetReq ? !targetReq.verified : true;
     setBloodRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, verified: !r.verified } : r))
+      prev.map((r) => (r.id === requestId ? { ...r, verified: newVer } : r))
     );
+    updateFirestoreBloodRequest(requestId, { verified: newVer });
     showToast('info', 'Verification Updated', 'Request verification status changed.');
   };
 
   const deleteBloodRequest = (id: string) => {
     setBloodRequests((prev) => prev.filter((r) => r.id !== id));
+    deleteFirestoreBloodRequest(id);
     showToast('info', 'Request Removed', 'Blood request deleted from registry.');
   };
 

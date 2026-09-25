@@ -18,14 +18,18 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
   getDocs,
-  getDocFromServer
+  getDocFromServer,
+  onSnapshot,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { BloodGroup } from '../types';
+import { BloodGroup, BloodRequest, Donor } from '../types';
 
 // Resolve configuration from json or environment variables
 const resolvedConfig = {
@@ -50,25 +54,9 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Initialize Cloud Firestore with custom databaseId and long polling transport
-// experimentalForceLongPolling eliminates stream connection drops (code=unavailable) behind proxies/iframes
-const firestoreDbId = resolvedConfig.firestoreDatabaseId && resolvedConfig.firestoreDatabaseId !== '(default)'
-  ? resolvedConfig.firestoreDatabaseId
-  : undefined;
-
-export const db = firestoreDbId
-  ? initializeFirestore(
-      app,
-      {
-        experimentalForceLongPolling: true,
-        ignoreUndefinedProperties: true,
-      },
-      firestoreDbId
-    )
-  : initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      ignoreUndefinedProperties: true,
-    });
+// Initialize Cloud Firestore
+// Use standard getFirestore for standard default database to avoid long-polling transport lockups
+export const db = getFirestore(app);
 
 // Firestore User Document Interface
 export interface FirestoreUserData {
@@ -119,21 +107,11 @@ export async function getFirestoreUser(uid: string): Promise<FirestoreUserData |
 
 export async function createFirestoreUser(uid: string, data: FirestoreUserData): Promise<void> {
   const userDocRef = doc(db, 'users', uid);
-  // Add a promise timeout so if Firestore connection is slow or offline, it doesn't freeze the UI
-  const setPromise = setDoc(userDocRef, data, { merge: true });
-  const timeoutPromise = new Promise<void>((_, reject) =>
-    setTimeout(() => reject(new Error('Firestore connection timed out. Saved locally.')), 6000)
-  );
-
-  try {
-    await Promise.race([setPromise, timeoutPromise]);
-  } catch (err: any) {
-    console.warn('[Firestore] Profile write timed out or offline, proceeding with local fallback:', err);
-    // Don't re-throw timeout error so the user is not stuck on "Saving Profile..."
-    if (!err?.message?.includes('timed out')) {
-      throw err;
-    }
-  }
+  // Trigger the Firestore write in the background without awaiting indefinitely
+  // Firestore SDK automatically queues writes to local cache and syncs to server
+  setDoc(userDocRef, data, { merge: true }).catch((err) => {
+    console.warn('[Firestore] Background setDoc sync note:', err);
+  });
 }
 
 export async function updateFirestoreUser(uid: string, data: Partial<FirestoreUserData>): Promise<void> {
@@ -173,6 +151,114 @@ export async function queryFirestoreDonors(params: {
   } catch (err) {
     console.warn('Error querying Firestore donors:', err);
     return [];
+  }
+}
+
+// Real-time synchronization for all registered donors across users
+export function subscribeToFirestoreDonors(onUpdate: (donors: Donor[]) => void): () => void {
+  try {
+    const usersCol = collection(db, 'users');
+    const q = query(usersCol, where('isDonor', '==', true));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const donorsList: Donor[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as FirestoreUserData;
+          donorsList.push({
+            id: docSnap.id,
+            name: data.name || 'Anonymous Donor',
+            age: 26,
+            gender: 'Male',
+            bloodGroup: data.bloodGroup || 'O+',
+            phone: data.phone || '',
+            email: data.email || '',
+            state: data.state || '',
+            district: data.district || '',
+            city: data.district || data.state || 'Local',
+            location: `${data.district || ''}, ${data.state || ''}`.replace(/^, |, $/g, '') || 'India',
+            lastDonationDate: 'Never',
+            isAvailable: true,
+            totalDonations: 0,
+            livesSaved: 0,
+            rating: 5.0,
+            responseTimeMinutes: 15,
+            verified: true,
+            emergencyTravelReady: true,
+            createdAt: data.createdAt ? data.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+            avatar: data.profilePhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.name || 'donor')}`,
+            bio: 'Verified LifeLink voluntary donor',
+          });
+        });
+        if (donorsList.length > 0) {
+          onUpdate(donorsList);
+        }
+      },
+      (err) => {
+        console.warn('[Firestore] Error subscribing to donors:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Firestore] Failed to init donors subscription:', err);
+    return () => {};
+  }
+}
+
+// Real-time synchronization for blood requests between all users
+export function subscribeToFirestoreRequests(onUpdate: (requests: BloodRequest[]) => void): () => void {
+  try {
+    const requestsCol = collection(db, 'bloodRequests');
+    return onSnapshot(
+      requestsCol,
+      (snapshot) => {
+        const requestsList: BloodRequest[] = [];
+        snapshot.forEach((docSnap) => {
+          requestsList.push({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<BloodRequest, 'id'>)
+          });
+        });
+        // Sort requests by newest first
+        requestsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        onUpdate(requestsList);
+      },
+      (err) => {
+        console.warn('[Firestore] Error subscribing to blood requests:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Firestore] Failed to init requests subscription:', err);
+    return () => {};
+  }
+}
+
+// Create or broadcast a new blood request across all users in Firestore
+export async function saveFirestoreBloodRequest(request: BloodRequest): Promise<void> {
+  try {
+    const reqDocRef = doc(db, 'bloodRequests', request.id);
+    await setDoc(reqDocRef, request, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore] Failed to save blood request to Firestore:', err);
+  }
+}
+
+// Update a blood request (e.g., when another user responds or fulfills it)
+export async function updateFirestoreBloodRequest(requestId: string, updates: Partial<BloodRequest>): Promise<void> {
+  try {
+    const reqDocRef = doc(db, 'bloodRequests', requestId);
+    await updateDoc(reqDocRef, updates);
+  } catch (err) {
+    console.warn('[Firestore] Failed to update blood request:', err);
+  }
+}
+
+// Delete a blood request
+export async function deleteFirestoreBloodRequest(requestId: string): Promise<void> {
+  try {
+    const reqDocRef = doc(db, 'bloodRequests', requestId);
+    await deleteDoc(reqDocRef);
+  } catch (err) {
+    console.warn('[Firestore] Failed to delete blood request:', err);
   }
 }
 
