@@ -83,7 +83,10 @@ export interface AppNotification {
   title: string;
   message: string;
   type: 'emergency' | 'match' | 'system' | 'reminder';
-  timestamp: string;
+  timestamp: string; // e.g. "Just now" or relative formatted
+  receivedTime?: string; // Formatted 12-hour clock: e.g. "10:45 AM"
+  receivedDate?: string; // Formatted date: e.g. "25 Sep 2026"
+  createdAtIso?: string; // ISO 8601 string for precise calculation
   read: boolean;
   tabTarget?: NavigationTab;
   requestId?: string;

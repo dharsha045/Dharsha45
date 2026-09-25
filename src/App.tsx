@@ -7,7 +7,6 @@ import { ToastContainer } from './components/Toast';
 import { RespondModal } from './components/RespondModal';
 import { CertificateModal } from './components/CertificateModal';
 import { DonorContactModal } from './components/DonorContactModal';
-import { NotificationPopover } from './components/NotificationPopover';
 
 // Page Views
 import { HomeView } from './views/HomeView';
@@ -88,7 +87,6 @@ const AppContent: React.FC = () => {
       <RespondModal />
       <CertificateModal />
       <DonorContactModal />
-      <NotificationPopover />
       <ToastContainer />
     </div>
   );

@@ -150,3 +150,48 @@ export function calculateDistanceKm(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c * 10) / 10;
 }
+
+/**
+ * Formats a notification received timestamp into human-readable clock time and relative time
+ */
+export function formatNotificationTime(isoOrTimestamp?: string): {
+  timeStr: string;
+  dateStr: string;
+  relativeStr: string;
+} {
+  const date = isoOrTimestamp ? new Date(isoOrTimestamp) : new Date();
+  const validDate = isNaN(date.getTime()) ? new Date() : date;
+
+  // 12-hour format e.g. "10:45 AM"
+  const timeStr = validDate.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  // Date e.g. "25 Sep 2026"
+  const dateStr = validDate.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - validDate.getTime()) / 1000);
+
+  let relativeStr = 'Just now';
+  if (diffSec < 45) {
+    relativeStr = 'Just now';
+  } else if (diffSec < 3600) {
+    const mins = Math.floor(diffSec / 60);
+    relativeStr = `${mins}m ago`;
+  } else if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    relativeStr = `${hours}h ago`;
+  } else {
+    const days = Math.floor(diffSec / 86400);
+    relativeStr = days === 1 ? 'Yesterday' : `${days}d ago`;
+  }
+
+  return { timeStr, dateStr, relativeStr };
+}

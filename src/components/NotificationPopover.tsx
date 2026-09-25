@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Siren, CheckCircle2, Info, Clock, CheckCheck, Trash2, X, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Bell, Siren, CheckCircle2, Info, Clock, CheckCheck, Trash2, X, Volume2, VolumeX, Sparkles, Calendar } from 'lucide-react';
+import { formatNotificationTime } from '../utils/compatibility';
 
 interface NotificationPopoverProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
   };
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fade-in">
+    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-slide-down">
       {/* Header */}
       <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
         <div className="flex items-center gap-2">
