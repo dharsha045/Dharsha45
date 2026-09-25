@@ -33,7 +33,7 @@ const resolvedConfig = {
   appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || firebaseConfig?.appId || '1:371470662405:web:6afe48560bfbb156dc956c',
   apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey || 'AIzaSyDn5AghLgDmE_cNshaUIk_T4lqfqmBhEOM',
   authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig?.authDomain || 'original-flag-vnm8c.firebaseapp.com',
-  firestoreDatabaseId: (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig?.firestoreDatabaseId || 'ai-studio-lifelinksmartblo-770e1c6a-9341-4762-b132-1cf4239fc443',
+  firestoreDatabaseId: (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId || undefined,
   storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig?.storageBucket || 'original-flag-vnm8c.firebasestorage.app',
   messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig?.messagingSenderId || '371470662405',
 };
@@ -101,20 +101,39 @@ export async function testFirestoreConnection(): Promise<boolean> {
 export async function getFirestoreUser(uid: string): Promise<FirestoreUserData | null> {
   try {
     const userDocRef = doc(db, 'users', uid);
-    const snap = await getDoc(userDocRef);
-    if (snap.exists()) {
+    const getPromise = getDoc(userDocRef);
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore getDoc timeout')), 5000)
+    );
+
+    const snap = await Promise.race([getPromise, timeoutPromise]) as any;
+    if (snap && snap.exists && snap.exists()) {
       return snap.data() as FirestoreUserData;
     }
     return null;
   } catch (err) {
-    console.error('Error fetching Firestore user profile:', err);
+    console.warn('[Firestore] getFirestoreUser fallback:', err);
     return null;
   }
 }
 
 export async function createFirestoreUser(uid: string, data: FirestoreUserData): Promise<void> {
   const userDocRef = doc(db, 'users', uid);
-  await setDoc(userDocRef, data, { merge: true });
+  // Add a promise timeout so if Firestore connection is slow or offline, it doesn't freeze the UI
+  const setPromise = setDoc(userDocRef, data, { merge: true });
+  const timeoutPromise = new Promise<void>((_, reject) =>
+    setTimeout(() => reject(new Error('Firestore connection timed out. Saved locally.')), 6000)
+  );
+
+  try {
+    await Promise.race([setPromise, timeoutPromise]);
+  } catch (err: any) {
+    console.warn('[Firestore] Profile write timed out or offline, proceeding with local fallback:', err);
+    // Don't re-throw timeout error so the user is not stuck on "Saving Profile..."
+    if (!err?.message?.includes('timed out')) {
+      throw err;
+    }
+  }
 }
 
 export async function updateFirestoreUser(uid: string, data: Partial<FirestoreUserData>): Promise<void> {
