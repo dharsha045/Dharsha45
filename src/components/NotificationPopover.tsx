@@ -57,14 +57,17 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-sm">Blood Request Notifications</span>
+              <span className="font-bold text-sm">Live Donor Alerts</span>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-bold">
                   {unreadCount} new
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-400">Updates on blood requests & responses</p>
+            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block"></span>
+              Live broadcast to all registered donors
+            </p>
           </div>
         </div>
 

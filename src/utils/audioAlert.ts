@@ -88,6 +88,37 @@ class SoundManager {
     this.soundEnabled = !this.soundEnabled;
     return this.soundEnabled;
   }
+
+  // Request browser Web Push/Desktop/Mobile notification permission
+  public async requestNotificationPermission(): Promise<boolean> {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission !== 'denied') {
+        const perm = await Notification.requestPermission();
+        return perm === 'granted';
+      }
+    }
+    return false;
+  }
+
+  // Show native device notification with sound & vibration
+  public showDeviceNotification(title: string, options?: NotificationOptions) {
+    try {
+      this.playUrgentAlertChime();
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          icon: '/favicon.ico',
+          badge: '/favicon.ico',
+          ...options
+        });
+      }
+    } catch {
+      // Fallback
+    }
+  }
 }
 
 export const soundManager = new SoundManager();

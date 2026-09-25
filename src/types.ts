@@ -87,6 +87,9 @@ export interface AppNotification {
   read: boolean;
   tabTarget?: NavigationTab;
   requestId?: string;
+  targetUserId?: string; // If specified, targeted to a specific donor UID, or 'all'
+  targetBloodGroup?: string; // Specific blood group broadcast
+  targetDistrict?: string;
 }
 
 export type NavigationTab = 

@@ -39,6 +39,8 @@ import {
   saveFirestoreBloodRequest,
   updateFirestoreBloodRequest,
   deleteFirestoreBloodRequest,
+  broadcastGlobalNotification,
+  subscribeToGlobalNotifications,
   FirebaseUser
 } from '../services/firebase';
 
@@ -414,9 +416,94 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   // Real-time synchronization for blood requests across all signed-in users
+  const isFirstLoadRef = useRef(true);
+  const knownReqIdsRef = useRef<Set<string>>(new Set());
+  const knownResponsesMapRef = useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
+    // Request permission once for sound/device alerts
+    soundManager.requestNotificationPermission().catch(() => {});
+
     const unsubRequests = subscribeToFirestoreRequests((firestoreReqs) => {
       if (firestoreReqs && firestoreReqs.length > 0) {
+        // Detect newly arrived requests or new donor responses from other users
+        if (!isFirstLoadRef.current) {
+          firestoreReqs.forEach((r) => {
+            const previousResponseCount = knownResponsesMapRef.current.get(r.id) || 0;
+
+            if (!knownReqIdsRef.current.has(r.id)) {
+              // BRAND NEW blood request created from another mobile/device!
+              knownReqIdsRef.current.add(r.id);
+              knownResponsesMapRef.current.set(r.id, r.responsesCount || 0);
+
+              // 1. Play alert sound and device vibration
+              soundManager.showDeviceNotification(
+                `🚨 Urgent ${r.requiredBloodGroup} Blood Needed!`,
+                {
+                  body: `${r.patientName} urgently needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`,
+                  tag: r.id
+                }
+              );
+
+              // 2. Display high-priority Toast alert
+              showToast(
+                'emergency',
+                `🚨 NEW EMERGENCY REQUEST: ${r.requiredBloodGroup}`,
+                `${r.patientName} needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`
+              );
+
+              // 3. Add to notifications feed
+              const incomingNotif: AppNotification = {
+                id: `notif-incoming-${Date.now()}-${r.id}`,
+                title: `${r.emergencyLevel === 'Critical' ? '🚨 CRITICAL SOS' : '🩸 Urgent Blood Request'}: ${r.requiredBloodGroup}`,
+                message: `${r.patientName} urgently needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`,
+                type: 'emergency',
+                timestamp: 'Just now',
+                read: false,
+                tabTarget: 'emergency-alerts',
+                requestId: r.id,
+              };
+              setNotifications((prev) => [incomingNotif, ...prev]);
+            } else if ((r.responsesCount || 0) > previousResponseCount) {
+              // Another mobile/user just RESPONDED to this blood request!
+              knownResponsesMapRef.current.set(r.id, r.responsesCount || 0);
+
+              soundManager.showDeviceNotification(
+                `🤝 Donor Responded to Blood Request!`,
+                {
+                  body: `${r.assignedDonorName || 'A donor'} has committed to help patient ${r.patientName}.`,
+                  tag: `response-${r.id}`
+                }
+              );
+
+              showToast(
+                'success',
+                `🤝 DONOR RESPONDED!`,
+                `${r.assignedDonorName || 'A donor'} responded for ${r.patientName} (${r.requiredBloodGroup}). Phone: ${r.assignedDonorPhone || 'Contact provided'}`
+              );
+
+              const responseNotif: AppNotification = {
+                id: `notif-resp-${Date.now()}-${r.id}`,
+                title: '🤝 Donor Accepted Blood Request!',
+                message: `${r.assignedDonorName || 'A voluntary donor'} responded for ${r.patientName}. Contact: ${r.assignedDonorPhone || 'In request details'}.`,
+                type: 'match',
+                timestamp: 'Just now',
+                read: false,
+                tabTarget: 'emergency-alerts',
+                requestId: r.id,
+              };
+              setNotifications((prev) => [responseNotif, ...prev]);
+            }
+          });
+        } else {
+          // Initialize known IDs and response counts on first load
+          firestoreReqs.forEach((r) => {
+            knownReqIdsRef.current.add(r.id);
+            knownResponsesMapRef.current.set(r.id, r.responsesCount || 0);
+          });
+          isFirstLoadRef.current = false;
+        }
+
         setBloodRequests((prev) => {
           // Merge remote requests with any local unsynced requests
           const map = new Map<string, BloodRequest>();
@@ -446,9 +533,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     });
 
+    // Real-time listener for global notification alerts broadcast across ALL donor accounts
+    const unsubGlobalNotifs = subscribeToGlobalNotifications((remoteNotif) => {
+      // Avoid duplicating notifications already handled
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === remoteNotif.id)) return prev;
+
+        // Play sound and show toast
+        soundManager.showDeviceNotification(remoteNotif.title, {
+          body: remoteNotif.message,
+          tag: remoteNotif.id,
+        });
+
+        showToast(
+          remoteNotif.type === 'emergency' ? 'emergency' : 'success',
+          remoteNotif.title,
+          remoteNotif.message
+        );
+
+        return [remoteNotif, ...prev];
+      });
+    });
+
     return () => {
       unsubRequests();
       unsubDonors();
+      unsubGlobalNotifs();
     };
   }, []);
 
@@ -606,6 +716,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       verified: true,
     };
 
+    knownReqIdsRef.current.add(newReq.id);
+    knownResponsesMapRef.current.set(newReq.id, 0);
+
     setBloodRequests((prev) => [newReq, ...prev]);
     // Broadcast to Cloud Firestore so ALL other users instantly see it
     saveFirestoreBloodRequest(newReq);
@@ -620,8 +733,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       read: false,
       tabTarget: 'emergency-alerts',
       requestId: newReq.id,
+      targetBloodGroup: newReq.requiredBloodGroup,
+      targetDistrict: newReq.district || newReq.city,
     };
     setNotifications((prev) => [alertNotif, ...prev]);
+
+    // Broadcast across Firestore so ALL registered donors get this notification instantly
+    broadcastGlobalNotification(alertNotif);
 
     showToast(
       newReq.emergencyLevel === 'Critical' ? 'emergency' : 'success',
@@ -675,6 +793,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       requestId,
     };
     setNotifications((prev) => [matchNotif, ...prev]);
+    // Broadcast to all accounts
+    broadcastGlobalNotification(matchNotif);
 
     showToast(
       'success',

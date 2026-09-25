@@ -29,17 +29,17 @@ import {
   limit
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { BloodGroup, BloodRequest, Donor } from '../types';
+import { BloodGroup, BloodRequest, Donor, AppNotification } from '../types';
 
 // Resolve configuration from json or environment variables
 const resolvedConfig = {
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || firebaseConfig?.projectId || 'original-flag-vnm8c',
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || firebaseConfig?.appId || '1:371470662405:web:6afe48560bfbb156dc956c',
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey || 'AIzaSyDn5AghLgDmE_cNshaUIk_T4lqfqmBhEOM',
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig?.authDomain || 'original-flag-vnm8c.firebaseapp.com',
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || firebaseConfig?.projectId || 'lifelink-blood-donation45',
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || firebaseConfig?.appId || '1:22210227466:web:933f3bb4687152a7989ef3',
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey || 'AIzaSyBtNsPl4_VQ0p675bVT-GPdchhovpMzTAE',
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig?.authDomain || 'lifelink-blood-donation45.firebaseapp.com',
   firestoreDatabaseId: (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId || undefined,
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig?.storageBucket || 'original-flag-vnm8c.firebasestorage.app',
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig?.messagingSenderId || '371470662405',
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig?.storageBucket || 'lifelink-blood-donation45.firebasestorage.app',
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig?.messagingSenderId || '22210227466',
 };
 
 // Initialize Firebase App
@@ -54,9 +54,13 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Initialize Cloud Firestore
-// Use standard getFirestore for standard default database to avoid long-polling transport lockups
-export const db = getFirestore(app);
+// Initialize Cloud Firestore with resilient auto-detect transport
+// experimentalAutoDetectLongPolling allows Firestore to bypass WebSocket blocking/proxy disconnects
+// while maintaining fast local cache and offline capability
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  ignoreUndefinedProperties: true,
+});
 
 // Firestore User Document Interface
 export interface FirestoreUserData {
@@ -259,6 +263,49 @@ export async function deleteFirestoreBloodRequest(requestId: string): Promise<vo
     await deleteDoc(reqDocRef);
   } catch (err) {
     console.warn('[Firestore] Failed to delete blood request:', err);
+  }
+}
+
+// Broadcast a high-priority notification to ALL registered donors across devices
+export async function broadcastGlobalNotification(notification: AppNotification): Promise<void> {
+  try {
+    const notifColRef = doc(db, 'globalNotifications', notification.id);
+    await setDoc(notifColRef, {
+      ...notification,
+      createdAtIso: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore] Failed to broadcast global notification:', err);
+  }
+}
+
+// Subscribe to global real-time notifications for all donors
+export function subscribeToGlobalNotifications(
+  onNewNotification: (notif: AppNotification) => void
+): () => void {
+  try {
+    const notifCol = collection(db, 'globalNotifications');
+    const q = query(notifCol, orderBy('timestamp', 'desc'), limit(50));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data() as AppNotification;
+            onNewNotification({
+              ...data,
+              id: change.doc.id,
+            });
+          }
+        });
+      },
+      (err) => {
+        console.warn('[Firestore] Global notifications subscription warning:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Firestore] Global notification listener init note:', err);
+    return () => {};
   }
 }
 
