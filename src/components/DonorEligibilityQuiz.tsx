@@ -15,15 +15,15 @@ export const DonorEligibilityQuiz: React.FC = () => {
 
   // Criteria Evaluation
   const isAgeValid = age >= 18 && age <= 65;
-  const isWeightValid = weight >= 50;
+  const isWeightValid = weight >= 60;
   const isIntervalValid = lastDonationOption !== 'less_than_2_months';
   const isHealthValid = !hasTattooRecent && !hasFever && !isPregnant && !hasChronicCondition;
 
   const isEligible = isAgeValid && isWeightValid && isIntervalValid && isHealthValid;
 
   const failReasons: string[] = [];
-  if (!isAgeValid) failReasons.push('Standard donors must be between 18 and 65 years of age.');
-  if (!isWeightValid) failReasons.push('Donor body weight must be at least 50 kg (110 lbs).');
+  if (!isAgeValid) failReasons.push('Standard donors must be at least 18 years of age (18–65).');
+  if (!isWeightValid) failReasons.push('Donor body weight must be at least 60 kg (≥60 kg required).');
   if (!isIntervalValid) failReasons.push('Minimum interval between standard whole blood donations is 56 days (8 weeks).');
   if (hasTattooRecent) failReasons.push('Tattoos or piercings require a 3-month deferral safety window.');
   if (hasFever) failReasons.push('Please wait until you are fully symptom-free from cold/fever for at least 48 hours.');
@@ -76,7 +76,7 @@ export const DonorEligibilityQuiz: React.FC = () => {
                 Your Body Weight: <strong className="text-slate-900 text-sm">{weight} kg</strong> (~{Math.round(weight * 2.2)} lbs)
               </label>
               <span className={`text-xs font-bold ${isWeightValid ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {isWeightValid ? '✓ Eligible Weight (≥50kg)' : '✗ Minimum 50kg'}
+                {isWeightValid ? '✓ Eligible Weight (≥60kg)' : '✗ Minimum 60kg required'}
               </span>
             </div>
             <input

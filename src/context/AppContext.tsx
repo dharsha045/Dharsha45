@@ -80,6 +80,8 @@ interface AppContextType {
     password: string;
     phone: string;
     bloodGroup: BloodGroup;
+    age?: number;
+    weight?: number;
     state: string;
     district: string;
   }) => Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }>;
@@ -87,6 +89,8 @@ interface AppContextType {
   completeGoogleProfile: (params: {
     phone: string;
     bloodGroup: BloodGroup;
+    age?: number;
+    weight?: number;
     state: string;
     district: string;
   }) => Promise<{ success: boolean; error?: string }>;
@@ -351,6 +355,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               phone: profile.phone,
               mobile: profile.phone,
               bloodGroup: profile.bloodGroup,
+              age: profile.age,
+              weight: profile.weight,
               state: profile.state,
               district: profile.district,
               city: profile.district || profile.state,
@@ -371,7 +377,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const donorEntry: Donor = {
                 id: fbUser.uid,
                 name: profile.name,
-                age: 26,
+                age: profile.age || 26,
                 gender: 'Male',
                 bloodGroup: profile.bloodGroup,
                 phone: profile.phone,
@@ -1002,6 +1008,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     password: string;
     phone: string;
     bloodGroup: BloodGroup;
+    age?: number;
+    weight?: number;
     state: string;
     district: string;
   }): Promise<{ success: boolean; error?: string; emailVerificationPending?: boolean }> => {
@@ -1026,6 +1034,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         profilePhoto: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(params.name.trim())}`,
         phone: formattedPhone,
         bloodGroup: params.bloodGroup,
+        age: params.age,
+        weight: params.weight,
         state: params.state,
         district: params.district,
         isDonor: true,
@@ -1117,6 +1127,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const completeGoogleProfile = async (params: {
     phone: string;
     bloodGroup: BloodGroup;
+    age?: number;
+    weight?: number;
     state: string;
     district: string;
   }): Promise<{ success: boolean; error?: string }> => {
@@ -1143,6 +1155,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         profilePhoto,
         phone: formattedPhone,
         bloodGroup: params.bloodGroup,
+        age: params.age,
+        weight: params.weight,
         state: params.state,
         district: params.district,
         isDonor: true,
@@ -1161,6 +1175,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         phone: formattedPhone,
         mobile: formattedPhone,
         bloodGroup: params.bloodGroup,
+        age: params.age,
+        weight: params.weight,
         state: params.state,
         district: params.district,
         city: params.district,

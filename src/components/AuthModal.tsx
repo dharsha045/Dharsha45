@@ -73,6 +73,8 @@ export const AuthModal: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
+  const [age, setAge] = useState<string>('24');
+  const [weightKg, setWeightKg] = useState<string>('65');
   const [selectedState, setSelectedState] = useState('');
   const [district, setDistrict] = useState('');
 
@@ -165,6 +167,23 @@ export const AuthModal: React.FC = () => {
       setErrorMsg('Please enter a valid 10-digit Indian mobile number (+91).');
       return;
     }
+
+    const numAge = Number(age);
+    if (!age || isNaN(numAge) || numAge < 18) {
+      setErrorMsg('Donor age must be at least 18 years (age ≥ 18 required for donation).');
+      return;
+    }
+    if (numAge > 65) {
+      setErrorMsg('Donor age must be 65 or below for safe voluntary donation.');
+      return;
+    }
+
+    const numWeight = Number(weightKg);
+    if (!weightKg || isNaN(numWeight) || numWeight < 60) {
+      setErrorMsg('Donor weight must be at least 60 kg (weight ≥ 60 kg required).');
+      return;
+    }
+
     if (!selectedState) {
       setErrorMsg('Please select your State / Union Territory.');
       return;
@@ -181,6 +200,8 @@ export const AuthModal: React.FC = () => {
       password,
       phone: `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`,
       bloodGroup,
+      age: numAge,
+      weight: numWeight,
       state: selectedState,
       district,
     });
@@ -227,6 +248,23 @@ export const AuthModal: React.FC = () => {
       setErrorMsg('Please enter a valid 10-digit Indian mobile number (+91).');
       return;
     }
+
+    const numAge = Number(age);
+    if (!age || isNaN(numAge) || numAge < 18) {
+      setErrorMsg('Donor age must be at least 18 years (age ≥ 18 required for donation).');
+      return;
+    }
+    if (numAge > 65) {
+      setErrorMsg('Donor age must be 65 or below for safe voluntary donation.');
+      return;
+    }
+
+    const numWeight = Number(weightKg);
+    if (!weightKg || isNaN(numWeight) || numWeight < 60) {
+      setErrorMsg('Donor weight must be at least 60 kg (weight ≥ 60 kg required).');
+      return;
+    }
+
     if (!selectedState) {
       setErrorMsg('Please select your State / Union Territory.');
       return;
@@ -240,6 +278,8 @@ export const AuthModal: React.FC = () => {
     const res = await completeGoogleProfile({
       phone: `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`,
       bloodGroup,
+      age: numAge,
+      weight: numWeight,
       state: selectedState,
       district,
     });
@@ -544,6 +584,47 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
+              {/* Age & Weight (Minimum Age 18, Minimum Weight 60kg) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Age <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-semibold">Min 18</span>
+                  </div>
+                  <input
+                    type="number"
+                    required
+                    min={18}
+                    max={65}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="e.g. 24"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Weight (kg) <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-600 font-bold">Min 60kg</span>
+                  </div>
+                  <input
+                    type="number"
+                    required
+                    min={60}
+                    max={150}
+                    value={weightKg}
+                    onChange={(e) => setWeightKg(e.target.value)}
+                    placeholder="e.g. 65"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                  />
+                </div>
+              </div>
+
               {/* State & District Dependent Dropdowns */}
               <LocationSelector
                 selectedState={selectedState}
@@ -702,6 +783,47 @@ export const AuthModal: React.FC = () => {
                             {bg}
                           </button>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Age & Weight (Minimum Age 18, Minimum Weight 60kg) */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Age <span className="text-red-500">*</span>
+                          </label>
+                          <span className="text-[10px] text-slate-500 font-semibold">Min 18</span>
+                        </div>
+                        <input
+                          type="number"
+                          required
+                          min={18}
+                          max={65}
+                          value={age}
+                          onChange={(e) => setAge(e.target.value)}
+                          placeholder="e.g. 24"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Weight (kg) <span className="text-red-500">*</span>
+                          </label>
+                          <span className="text-[10px] text-red-600 font-bold">Min 60kg</span>
+                        </div>
+                        <input
+                          type="number"
+                          required
+                          min={60}
+                          max={150}
+                          value={weightKg}
+                          onChange={(e) => setWeightKg(e.target.value)}
+                          placeholder="e.g. 65"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                        />
                       </div>
                     </div>
 

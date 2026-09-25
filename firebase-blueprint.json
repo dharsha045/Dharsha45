@@ -27,6 +27,17 @@
           "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
           "description": "Blood group of the user"
         },
+        "age": {
+          "type": "number",
+          "minimum": 18,
+          "maximum": 65,
+          "description": "Age of the voluntary donor (min 18)"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 60,
+          "description": "Weight of the voluntary donor in kg (min 60kg)"
+        },
         "state": {
           "type": "string",
           "description": "State or Union Territory in India"

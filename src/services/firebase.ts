@@ -69,6 +69,8 @@ export interface FirestoreUserData {
   profilePhoto: string;
   phone: string;
   bloodGroup: BloodGroup;
+  age?: number;
+  weight?: number;
   state: string;
   district: string;
   isDonor: boolean;
@@ -172,7 +174,7 @@ export function subscribeToFirestoreDonors(onUpdate: (donors: Donor[]) => void):
           donorsList.push({
             id: docSnap.id,
             name: data.name || 'Anonymous Donor',
-            age: 26,
+            age: data.age || 26,
             gender: 'Male',
             bloodGroup: data.bloodGroup || 'O+',
             phone: data.phone || '',

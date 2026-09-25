@@ -113,6 +113,8 @@ export interface AuthUser {
   mobile?: string;
   phone?: string;
   bloodGroup?: BloodGroup;
+  age?: number;
+  weight?: number;
   role: 'donor' | 'requester' | 'admin';
   city?: string;
   district?: string;

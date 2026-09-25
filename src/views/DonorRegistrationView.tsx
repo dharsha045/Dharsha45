@@ -98,8 +98,8 @@ export const DonorRegistrationView: React.FC = () => {
     if (!selectedState) errs.state = 'Please select your State / Union Territory';
     if (!district) errs.district = 'Please select your District';
     if (!location.trim()) errs.location = 'Specific area, colony, or nearest hospital landmark is required';
-    if (age < 18 || age > 65) errs.age = 'Age must be between 18 and 65 for safe donation as per NBTC India';
-    if (weightKg < 50) errs.weightKg = 'Minimum weight requirement is 50 kg for blood donation';
+    if (age < 18 || age > 65) errs.age = 'Donor age must be at least 18 years (18–65) for safe donation';
+    if (weightKg < 60) errs.weightKg = 'Donor weight must be at least 60 kg (≥60 kg required)';
     if (pinCode.trim() && pinCode.replace(/\D/g, '').length !== 6) {
       errs.pinCode = 'Indian PIN code must be 6 digits';
     }
@@ -265,11 +265,11 @@ export const DonorRegistrationView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Weight (kg) *
+                  Weight (kg, min 60kg) *
                 </label>
                 <input
                   type="number"
-                  min="50"
+                  min="60"
                   max="150"
                   required
                   value={weightKg}
