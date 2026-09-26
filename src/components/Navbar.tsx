@@ -18,9 +18,12 @@ import {
   LogOut,
   ChevronDown,
   Info,
-  LogIn
+  LogIn,
+  Share2,
+  Smartphone
 } from 'lucide-react';
 import { NotificationPopover } from './NotificationPopover';
+import { ShareAppModal } from './ShareAppModal';
 
 export const Navbar: React.FC = () => {
   const {
@@ -36,6 +39,7 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const unreadNotifs = notifications.filter((n) => !n.read).length;
   const criticalOpenCount = bloodRequests.filter(
@@ -124,6 +128,16 @@ export const Navbar: React.FC = () => {
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Share / Open on Phone Button */}
+            <button
+              onClick={() => setShareModalOpen(true)}
+              className="relative p-2 sm:p-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Open on Phone / Share Link"
+              aria-label="Open on Phone or Share Link"
+            >
+              <Smartphone className="w-5 h-5" />
+            </button>
+
             {/* Notification Bell */}
             <div className="relative">
               <button
@@ -370,7 +384,17 @@ export const Navbar: React.FC = () => {
             })}
           </div>
 
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-slate-100 space-y-1">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setShareModalOpen(true);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4 text-slate-500" />
+              <span>Open on Phone / Direct Link</span>
+            </button>
             <button
               onClick={() => handleNavClick('admin-dashboard')}
               className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
@@ -381,6 +405,9 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Share & Mobile Access Modal */}
+      <ShareAppModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} />
     </header>
   );
 };

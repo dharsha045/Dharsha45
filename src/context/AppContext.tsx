@@ -18,6 +18,7 @@ import {
   INITIAL_INVENTORY
 } from '../data/mockData';
 import { soundManager } from '../utils/audioAlert';
+import { formatNotificationTime } from '../utils/compatibility';
 import {
   auth,
   FirestoreUserData,
@@ -459,12 +460,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               );
 
               // 3. Add to notifications feed
+              const timeMeta = formatNotificationTime();
               const incomingNotif: AppNotification = {
                 id: `notif-incoming-${Date.now()}-${r.id}`,
                 title: `${r.emergencyLevel === 'Critical' ? '🚨 CRITICAL SOS' : '🩸 Urgent Blood Request'}: ${r.requiredBloodGroup}`,
                 message: `${r.patientName} urgently needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`,
                 type: 'emergency',
-                timestamp: 'Just now',
+                timestamp: timeMeta.relativeStr,
+                receivedTime: timeMeta.timeStr,
+                receivedDate: timeMeta.dateStr,
+                createdAtIso: new Date().toISOString(),
                 read: false,
                 tabTarget: 'emergency-alerts',
                 requestId: r.id,
@@ -488,12 +493,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 `${r.assignedDonorName || 'A donor'} responded for ${r.patientName} (${r.requiredBloodGroup}). Phone: ${r.assignedDonorPhone || 'Contact provided'}`
               );
 
+              const timeMeta = formatNotificationTime();
               const responseNotif: AppNotification = {
                 id: `notif-resp-${Date.now()}-${r.id}`,
                 title: '🤝 Donor Accepted Blood Request!',
                 message: `${r.assignedDonorName || 'A voluntary donor'} responded for ${r.patientName}. Contact: ${r.assignedDonorPhone || 'In request details'}.`,
                 type: 'match',
-                timestamp: 'Just now',
+                timestamp: timeMeta.relativeStr,
+                receivedTime: timeMeta.timeStr,
+                receivedDate: timeMeta.dateStr,
+                createdAtIso: new Date().toISOString(),
                 read: false,
                 tabTarget: 'emergency-alerts',
                 requestId: r.id,
@@ -730,12 +739,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     saveFirestoreBloodRequest(newReq);
 
     // Create immediate alert broadcast notification
+    const alertTimeMeta = formatNotificationTime();
     const alertNotif: AppNotification = {
       id: `notif-${Date.now()}`,
       title: `${newReq.emergencyLevel === 'Critical' ? '🚨 CRITICAL SOS' : '🩸 Urgent Blood Request'}: ${newReq.requiredBloodGroup}`,
       message: `${newReq.patientName} urgently needs ${newReq.unitsNeeded} unit(s) at ${newReq.hospitalName}, ${newReq.city}.`,
       type: 'emergency',
-      timestamp: 'Just now',
+      timestamp: alertTimeMeta.relativeStr,
+      receivedTime: alertTimeMeta.timeStr,
+      receivedDate: alertTimeMeta.dateStr,
+      createdAtIso: new Date().toISOString(),
       read: false,
       tabTarget: 'emergency-alerts',
       requestId: newReq.id,
@@ -788,12 +801,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       notes: updatedNotes,
     });
 
+    const matchTimeMeta = formatNotificationTime();
     const matchNotif: AppNotification = {
       id: `notif-${Date.now()}`,
       title: '🤝 Donor Response Registered!',
       message: `${donorName} responded to request for patient at ${requestId}. Contact coordinated.`,
       type: 'match',
-      timestamp: 'Just now',
+      timestamp: matchTimeMeta.relativeStr,
+      receivedTime: matchTimeMeta.timeStr,
+      receivedDate: matchTimeMeta.dateStr,
+      createdAtIso: new Date().toISOString(),
       read: false,
       tabTarget: 'emergency-alerts',
       requestId,

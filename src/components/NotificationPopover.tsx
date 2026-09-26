@@ -163,9 +163,9 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
                   <h4 className={`text-xs truncate ${!n.read ? 'text-slate-900 font-bold' : 'text-slate-700 font-medium'}`}>
                     {n.title}
                   </h4>
-                  <span className="text-[10px] text-slate-400 shrink-0 flex items-center gap-0.5">
+                  <span className="text-[10px] text-slate-400 shrink-0 flex items-center gap-0.5 whitespace-nowrap">
                     <Clock className="w-2.5 h-2.5" />
-                    {n.timestamp}
+                    {n.receivedTime ? `${n.receivedTime} • ${n.timestamp}` : n.timestamp}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5 line-clamp-2 leading-relaxed">
