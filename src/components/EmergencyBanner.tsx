@@ -28,38 +28,7 @@ export const EmergencyBanner: React.FC = () => {
   }, [criticalRequests.length]);
 
   if (criticalRequests.length === 0) {
-    return (
-      <aside aria-label="Network status" className="bg-slate-950 text-slate-300 px-4 py-1.5 border-b border-slate-800 text-xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex h-2 w-2 relative shrink-0">
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
-            <span className="font-semibold text-white truncate">Emergency Blood Network Active</span>
-            <span className="hidden sm:inline text-slate-400">· Pan-India verified donor dispatch ready</span>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0 text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab('emergency-alerts')}
-              className="text-slate-400 hover:text-white font-medium text-[11px] transition-colors cursor-pointer hidden xs:inline"
-            >
-              Emergency SOS Feed
-            </button>
-            <button
-              type="button"
-              onClick={toggleSound}
-              className="p-1 rounded text-slate-400 hover:text-white transition-colors cursor-pointer"
-              title={isSoundEnabled ? 'Mute Alert Sound' : 'Enable Alert Sound'}
-              aria-label={isSoundEnabled ? 'Mute Alert Sound' : 'Enable Alert Sound'}
-            >
-              {isSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            </button>
-          </div>
-        </div>
-      </aside>
-    );
+    return null;
   }
 
   const currentReq = criticalRequests[currentIndex % criticalRequests.length];

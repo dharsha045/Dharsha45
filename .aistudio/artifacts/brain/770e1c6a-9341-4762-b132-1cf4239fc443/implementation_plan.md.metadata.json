@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to fix notification duplicates, add subtle spring animations and fluid CSS transitions across views, and integrate subtle click sound feedback on key interactive buttons.",
-  "updatedAt":  "2026-11-09T16:17:37.090273503Z",
+  "summary":  "Plan to fix the Open on Phone / Share Link dialog so that it displays fully on all screen heights with responsive scrolling, closes immediately when tapping the dark backdrop overlay, responds to the Escape key, and provides a clear close button with proper touch targets.",
+  "updatedAt":  "2026-11-09T16:38:20.418748999Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
