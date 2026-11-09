@@ -73,9 +73,11 @@ const AppContent: React.FC = () => {
       {/* Main Sticky Navbar */}
       <Navbar />
 
-      {/* Main Page Content */}
-      <main className="flex-1">
-        {renderActiveView()}
+      {/* Main Page Content with smooth spring reveal */}
+      <main className="flex-1 transition-smooth">
+        <div key={activeTab} className="animate-spring-in">
+          {renderActiveView()}
+        </div>
       </main>
 
       {/* Footer */}

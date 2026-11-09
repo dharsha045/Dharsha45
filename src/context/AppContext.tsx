@@ -459,10 +459,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 `${r.patientName} needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`
               );
 
-              // 3. Add to notifications feed
+              // 3. Add to notifications feed (using deterministic ID to prevent duplication)
               const timeMeta = formatNotificationTime();
+              const notifId = `notif-req-${r.id}`;
               const incomingNotif: AppNotification = {
-                id: `notif-incoming-${Date.now()}-${r.id}`,
+                id: notifId,
                 title: `${r.emergencyLevel === 'Critical' ? '🚨 CRITICAL SOS' : '🩸 Urgent Blood Request'}: ${r.requiredBloodGroup}`,
                 message: `${r.patientName} urgently needs ${r.unitsNeeded} unit(s) at ${r.hospitalName}, ${r.city}.`,
                 type: 'emergency',
@@ -474,7 +475,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 tabTarget: 'emergency-alerts',
                 requestId: r.id,
               };
-              setNotifications((prev) => [incomingNotif, ...prev]);
+              setNotifications((prev) => {
+                if (prev.some((n) => n.id === notifId || (n.requestId === r.id && n.type === 'emergency'))) {
+                  return prev;
+                }
+                return [incomingNotif, ...prev];
+              });
             } else if ((r.responsesCount || 0) > previousResponseCount) {
               // Another mobile/user just RESPONDED to this blood request!
               knownResponsesMapRef.current.set(r.id, r.responsesCount || 0);
@@ -494,8 +500,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               );
 
               const timeMeta = formatNotificationTime();
+              const respNotifId = `notif-resp-${r.id}-${r.responsesCount || 1}`;
               const responseNotif: AppNotification = {
-                id: `notif-resp-${Date.now()}-${r.id}`,
+                id: respNotifId,
                 title: '🤝 Donor Accepted Blood Request!',
                 message: `${r.assignedDonorName || 'A voluntary donor'} responded for ${r.patientName}. Contact: ${r.assignedDonorPhone || 'In request details'}.`,
                 type: 'match',
@@ -507,7 +514,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 tabTarget: 'emergency-alerts',
                 requestId: r.id,
               };
-              setNotifications((prev) => [responseNotif, ...prev]);
+              setNotifications((prev) => {
+                if (prev.some((n) => n.id === respNotifId)) return prev;
+                return [responseNotif, ...prev];
+              });
             }
           });
         } else {
@@ -738,10 +748,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Broadcast to Cloud Firestore so ALL other users instantly see it
     saveFirestoreBloodRequest(newReq);
 
-    // Create immediate alert broadcast notification
+    // Create immediate alert broadcast notification with consistent ID
     const alertTimeMeta = formatNotificationTime();
+    const alertNotifId = `notif-req-${newReq.id}`;
     const alertNotif: AppNotification = {
-      id: `notif-${Date.now()}`,
+      id: alertNotifId,
       title: `${newReq.emergencyLevel === 'Critical' ? '🚨 CRITICAL SOS' : '🩸 Urgent Blood Request'}: ${newReq.requiredBloodGroup}`,
       message: `${newReq.patientName} urgently needs ${newReq.unitsNeeded} unit(s) at ${newReq.hospitalName}, ${newReq.city}.`,
       type: 'emergency',
@@ -755,7 +766,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       targetBloodGroup: newReq.requiredBloodGroup,
       targetDistrict: newReq.district || newReq.city,
     };
-    setNotifications((prev) => [alertNotif, ...prev]);
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === alertNotifId || (n.requestId === newReq.id && n.type === 'emergency'))) {
+        return prev;
+      }
+      return [alertNotif, ...prev];
+    });
 
     // Broadcast across Firestore so ALL registered donors get this notification instantly
     broadcastGlobalNotification(alertNotif);
@@ -802,8 +818,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     const matchTimeMeta = formatNotificationTime();
+    const matchNotifId = `notif-resp-${requestId}-${updatedCount}`;
     const matchNotif: AppNotification = {
-      id: `notif-${Date.now()}`,
+      id: matchNotifId,
       title: '🤝 Donor Response Registered!',
       message: `${donorName} responded to request for patient at ${requestId}. Contact coordinated.`,
       type: 'match',
@@ -815,7 +832,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tabTarget: 'emergency-alerts',
       requestId,
     };
-    setNotifications((prev) => [matchNotif, ...prev]);
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === matchNotifId)) return prev;
+      return [matchNotif, ...prev];
+    });
     // Broadcast to all accounts
     broadcastGlobalNotification(matchNotif);
 

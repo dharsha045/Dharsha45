@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { NotificationPopover } from './NotificationPopover';
 import { ShareAppModal } from './ShareAppModal';
+import { soundManager } from '../utils/audioAlert';
 
 export const Navbar: React.FC = () => {
   const {
@@ -47,6 +48,7 @@ export const Navbar: React.FC = () => {
   ).length;
 
   const handleNavClick = (tab: NavigationTab) => {
+    soundManager.playClickSound();
     setActiveTab(tab);
     setMobileMenuOpen(false);
   };

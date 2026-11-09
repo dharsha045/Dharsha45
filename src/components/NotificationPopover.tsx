@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Bell, Siren, CheckCircle2, Info, Clock, CheckCheck, Trash2, X, Volume2, VolumeX, Sparkles, Calendar } from 'lucide-react';
 import { formatNotificationTime } from '../utils/compatibility';
+import { soundManager } from '../utils/audioAlert';
 
 interface NotificationPopoverProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ isOpen
   });
 
   const handleNotificationClick = (notif: typeof notifications[0]) => {
+    soundManager.playClickSound();
     markNotificationRead(notif.id);
     if (notif.tabTarget) {
       setActiveTab(notif.tabTarget);

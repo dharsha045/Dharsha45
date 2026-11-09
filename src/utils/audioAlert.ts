@@ -84,6 +84,62 @@ class SoundManager {
     }
   }
 
+  // Soft tactile button interaction click sound
+  public playClickSound() {
+    if (!this.soundEnabled) return;
+    try {
+      this.init();
+      if (!this.audioCtx) return;
+
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(350, now + 0.04);
+
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.04);
+    } catch {
+      // Audio autoplay gracefully handled
+    }
+  }
+
+  // Soft success confirmation chime
+  public playSuccessSound() {
+    if (!this.soundEnabled) return;
+    try {
+      this.init();
+      if (!this.audioCtx) return;
+
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } catch {
+      // Audio autoplay gracefully handled
+    }
+  }
+
   public toggleSound(): boolean {
     this.soundEnabled = !this.soundEnabled;
     return this.soundEnabled;

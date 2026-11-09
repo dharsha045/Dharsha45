@@ -359,7 +359,7 @@ export function formatAuthError(error: any): string {
     return 'Please verify your email before continuing.';
   }
   if (code === 'auth/unauthorized-domain' || message.includes('unauthorized-domain')) {
-    return 'GitHub Pages domain unauthorized in Firebase: Please add your domain (e.g. github.io or your-username.github.io) in Firebase Console > Authentication > Settings > Authorized domains.';
+    return 'Domain unauthorized in Firebase: Please add your app domain in Firebase Console > Authentication > Settings > Authorized domains.';
   }
   if (code === 'auth/operation-not-allowed' || message.includes('operation-not-allowed')) {
     return 'Google Sign-In is disabled in Firebase Console. Go to Firebase Console > Authentication > Sign-in method > Google and click Enable.';

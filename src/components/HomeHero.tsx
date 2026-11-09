@@ -12,6 +12,7 @@ import {
   Users
 } from 'lucide-react';
 import { INDIAN_STATES_AND_UTS, getDistrictsForState } from '../data/indiaLocations';
+import { soundManager } from '../utils/audioAlert';
 
 export const HomeHero: React.FC = () => {
   const {
@@ -53,6 +54,7 @@ export const HomeHero: React.FC = () => {
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    soundManager.playClickSound();
     setSearchBloodGroupFilter(selectedBlood);
     setSearchStateFilter(selectedState);
     setSearchDistrictFilter(selectedDistrict);
